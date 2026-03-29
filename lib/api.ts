@@ -5,17 +5,19 @@ const API_BASE_URL =
 
 const API_URL = `${API_BASE_URL}/api`;
 
-async function getCsrfHeaders(includeJson = true) {
+async function getCsrfHeaders(includeJson = true): Promise<Record<string, string>> {
   const { csrfToken } = await ensureCsrf();
 
-  return includeJson
-    ? {
-        "Content-Type": "application/json",
-        "X-CSRFToken": csrfToken,
-      }
-    : {
-        "X-CSRFToken": csrfToken,
-      };
+  if (includeJson) {
+    return {
+      "Content-Type": "application/json",
+      "X-CSRFToken": csrfToken,
+    };
+  }
+
+  return {
+    "X-CSRFToken": csrfToken,
+  };
 }
 
 export async function fetchPatients() {
