@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { login, getMe } from "@/lib/auth";
 
-export default function LoginPage() {
-  const router = useRouter();
+function LoginPageContent() {
   const searchParams = useSearchParams();
 
   const rawNext = searchParams.get("next");
@@ -74,5 +73,13 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-6">Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
