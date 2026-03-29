@@ -4,6 +4,8 @@ export type DashboardSummary = {
   total_uploads: number;
   total_reports: number;
   total_consents: number;
+  encounters_pending_review: number;
+  completed_encounters: number;
   recent_encounters: {
     id: number;
     encounter_id: string;
