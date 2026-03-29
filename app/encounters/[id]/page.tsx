@@ -1,11 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
-  fetchEncounterByIdServer,
-  fetchEncounterUploadsServer,
-  fetchEncounterReportsServer,
-  fetchEncounterConsentsServer,
-  fetchPatientByIdServer,
-} from "@/lib/server-auth";
+  fetchEncounterById,
+  fetchEncounterUploads,
+  fetchEncounterReports,
+  fetchEncounterConsents,
+  fetchPatientById,
+} from "@/lib/api";
 import { Encounter } from "@/types/encounter";
 import { ImageUpload } from "@/types/upload";
 import { StructuredReport } from "@/types/report";
@@ -18,16 +21,66 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-export default async function EncounterDetailPage({ params }: Props) {
-  const { id } = await params;
+export default function EncounterDetailPage({ params }: Props) {
+  const [id, setId] = useState<string>("");
+  const [encounter, setEncounter] = useState<Encounter | null>(null);
+  const [patient, setPatient] = useState<any>(null);
+  const [uploads, setUploads] = useState<ImageUpload[]>([]);
+  const [reports, setReports] = useState<StructuredReport[]>([]);
+  const [consents, setConsents] = useState<ConsentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const encounter: Encounter = await fetchEncounterByIdServer(id);
-  const patient = await fetchPatientByIdServer(String(encounter.patient));
-  const uploads: ImageUpload[] = await fetchEncounterUploadsServer(id);
-  const reports: StructuredReport[] = await fetchEncounterReportsServer(id);
-  const consents: ConsentRecord[] = await fetchEncounterConsentsServer(id);
+  useEffect(() => {
+    async function resolveParamsAndLoad() {
+      try {
+        const resolvedParams = await params;
+        setId(resolvedParams.id);
+
+        const encounterData: Encounter = await fetchEncounterById(resolvedParams.id);
+        const patientData = await fetchPatientById(String(encounterData.patient));
+        const [uploadData, reportData, consentData] = await Promise.all([
+          fetchEncounterUploads(resolvedParams.id),
+          fetchEncounterReports(resolvedParams.id),
+          fetchEncounterConsents(resolvedParams.id),
+        ]);
+
+        setEncounter(encounterData);
+        setPatient(patientData);
+        setUploads(uploadData);
+        setReports(reportData);
+        setConsents(consentData);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load encounter details.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    resolveParamsAndLoad();
+  }, [params]);
+
+  if (loading) {
+    return (
+      <main className="p-10">
+        <p className="text-sm text-gray-700">Loading encounter...</p>
+      </main>
+    );
+  }
+
+  if (error || !encounter || !patient) {
+    return (
+      <main className="p-10">
+        <p className="text-sm text-red-600">
+          {error || "Encounter not found."}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="p-10 space-y-8">

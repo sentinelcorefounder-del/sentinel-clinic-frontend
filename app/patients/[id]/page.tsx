@@ -1,10 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
-  fetchPatientByIdServer,
-  fetchPatientEncountersServer,
-  fetchPatientReportsServer,
-  fetchPatientConsentsServer,
-} from "@/lib/server-auth";
+  fetchPatientById,
+  fetchPatientEncounters,
+  fetchPatientReports,
+  fetchPatientConsents,
+} from "@/lib/api";
 import { Patient } from "@/types/patient";
 import { Encounter } from "@/types/encounter";
 import { StructuredReport } from "@/types/report";
@@ -14,13 +17,61 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
-export default async function PatientDetailPage({ params }: Props) {
-  const { id } = await params;
+export default function PatientDetailPage({ params }: Props) {
+  const [id, setId] = useState<string>("");
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [encounters, setEncounters] = useState<Encounter[]>([]);
+  const [reports, setReports] = useState<StructuredReport[]>([]);
+  const [consents, setConsents] = useState<ConsentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-const patient: Patient = await fetchPatientByIdServer(id);
-const encounters: Encounter[] = await fetchPatientEncountersServer(id);
-const reports: StructuredReport[] = await fetchPatientReportsServer(id);
-const consents: ConsentRecord[] = await fetchPatientConsentsServer(id);
+  useEffect(() => {
+    async function resolveParamsAndLoad() {
+      try {
+        const resolvedParams = await params;
+        setId(resolvedParams.id);
+
+        const [patientData, encounterData, reportData, consentData] =
+          await Promise.all([
+            fetchPatientById(resolvedParams.id),
+            fetchPatientEncounters(resolvedParams.id),
+            fetchPatientReports(resolvedParams.id),
+            fetchPatientConsents(resolvedParams.id),
+          ]);
+
+        setPatient(patientData);
+        setEncounters(encounterData);
+        setReports(reportData);
+        setConsents(consentData);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load patient details.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    resolveParamsAndLoad();
+  }, [params]);
+
+  if (loading) {
+    return (
+      <main className="p-10">
+        <p className="text-sm text-gray-700">Loading patient...</p>
+      </main>
+    );
+  }
+
+  if (error || !patient) {
+    return (
+      <main className="p-10">
+        <p className="text-sm text-red-600">
+          {error || "Patient not found."}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="p-10 space-y-8">

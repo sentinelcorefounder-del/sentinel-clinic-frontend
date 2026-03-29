@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { fetchDashboardSummaryServer } from "@/lib/server-api";
+import { useEffect, useState } from "react";
+import { fetchDashboardSummary } from "@/lib/api";
 import { DashboardSummary } from "@/types/dashboard";
 
 function StatCard({
@@ -12,13 +15,49 @@ function StatCard({
   return (
     <div className="border rounded-xl p-5 bg-white shadow-sm">
       <p className="text-sm text-gray-500 mb-2">{title}</p>
-      <p className="text-3xl font-bold">{value}</p>
+      <p className="text-3xl font-bold text-gray-900">{value}</p>
     </div>
   );
 }
 
-export default async function DashboardPage() {
-  const summary: DashboardSummary = await fetchDashboardSummaryServer();
+export default function DashboardPage() {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadSummary() {
+      try {
+        const data = await fetchDashboardSummary();
+        setSummary(data);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load dashboard.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSummary();
+  }, []);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen p-10 bg-gray-50">
+        <p className="text-sm text-gray-700">Loading dashboard...</p>
+      </main>
+    );
+  }
+
+  if (error || !summary) {
+    return (
+      <main className="min-h-screen p-10 bg-gray-50">
+        <p className="text-sm text-red-600">
+          {error || "Dashboard unavailable."}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen p-10 bg-gray-50">
