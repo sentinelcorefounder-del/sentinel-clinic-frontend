@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createEncounter, fetchPatients } from "@/lib/api";
 
@@ -11,7 +11,7 @@ type PatientOption = {
   last_name: string;
 };
 
-export default function NewEncounterPage() {
+function NewEncounterPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedPatientId = Number(searchParams.get("patientId") || 0);
@@ -84,8 +84,8 @@ export default function NewEncounterPage() {
     }
 
     try {
-      await createEncounter(formData);
-      router.push("/encounters");
+      const createdEncounter = await createEncounter(formData);
+      router.push(`/encounters/${createdEncounter.id}`);
       router.refresh();
     } catch (err) {
       console.error(err);
@@ -214,5 +214,13 @@ export default function NewEncounterPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function NewEncounterPage() {
+  return (
+    <Suspense fallback={<div className="p-10">Loading...</div>}>
+      <NewEncounterPageContent />
+    </Suspense>
   );
 }
