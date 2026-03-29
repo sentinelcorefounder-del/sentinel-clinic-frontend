@@ -1,11 +1,9 @@
 export type DashboardSummary = {
-  totals: {
-    patients: number;
-    encounters: number;
-    uploads: number;
-    reports: number;
-    consents: number;
-  };
+  total_patients: number;
+  total_encounters: number;
+  total_uploads: number;
+  total_reports: number;
+  total_consents: number;
   recent_encounters: {
     id: number;
     encounter_id: string;
