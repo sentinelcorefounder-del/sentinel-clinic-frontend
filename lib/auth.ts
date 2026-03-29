@@ -20,8 +20,10 @@ export async function ensureCsrf() {
     throw new Error("Failed to initialize CSRF");
   }
 
+  const data = await res.json().catch(() => ({}));
+
   return {
-    csrfToken: getCookie("csrftoken") ?? "",
+    csrfToken: data.csrfToken || getCookie("csrftoken") || "",
   };
 }
 
@@ -49,7 +51,7 @@ export async function login(username: string, password: string) {
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "Login failed");
+  if (!res.ok) throw new Error(data.detail || data.error || "Login failed");
 
   return data as CurrentUser;
 }
@@ -83,7 +85,7 @@ export async function logout() {
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "Logout failed");
+  if (!res.ok) throw new Error(data.detail || data.error || "Logout failed");
 
   return data;
 }
