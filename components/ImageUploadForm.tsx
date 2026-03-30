@@ -78,8 +78,9 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
       setFile(null);
 
       router.refresh();
-    } catch {
-      setMessage("Upload failed.");
+    } catch (error) {
+      console.error(error);
+      setMessage(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       setLoading(false);
     }
