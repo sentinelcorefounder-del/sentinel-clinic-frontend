@@ -1,14 +1,9 @@
 import { ensureCsrf } from "@/lib/auth";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const API_URL = `${API_BASE_URL}/api`;
-
-import { getCookie } from "@/lib/auth";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function getCsrfHeaders(includeJson = true): Promise<Record<string, string>> {
   const { csrfToken } = await ensureCsrf();
@@ -144,13 +139,10 @@ export async function fetchEncounterReports(id: string) {
 }
 
 export async function createReport(data: any) {
-  const res = await fetch(`${API_BASE}/api/reports/`, {
+  const res = await fetch(`${API_URL}/reports/`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCookie("csrftoken") || "",
-    },
+    headers: await getCsrfHeaders(true),
     body: JSON.stringify(data),
   });
 
