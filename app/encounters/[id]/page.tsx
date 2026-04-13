@@ -83,7 +83,11 @@ export default function EncounterDetailPage({ params }: Props) {
       setConsents(refreshedConsents);
     } catch (err) {
       console.error("Failed to sync patient consent status:", err);
-      setError("Consent was saved, but patient consent status could not be updated.");
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Consent was saved, but patient consent status could not be updated.";
+      setError(message);
     }
   }
 
