@@ -5,6 +5,11 @@ const API_BASE_URL =
 
 const API_URL = `${API_BASE_URL}/api`;
 
+import { getCookie } from "@/lib/auth";
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 async function getCsrfHeaders(includeJson = true): Promise<Record<string, string>> {
   const { csrfToken } = await ensureCsrf();
 
@@ -139,19 +144,30 @@ export async function fetchEncounterReports(id: string) {
 }
 
 export async function createReport(data: any) {
-  const res = await fetch(`${API_URL}/reports/`, {
+  const res = await fetch(`${API_BASE}/api/reports/`, {
     method: "POST",
     credentials: "include",
-    headers: await getCsrfHeaders(true),
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCookie("csrftoken") || "",
+    },
     body: JSON.stringify(data),
   });
 
+  const responseData = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to create report: ${res.status} ${text}`);
+    const detail =
+      responseData?.detail ||
+      responseData?.non_field_errors?.[0] ||
+      responseData?.encounter?.[0] ||
+      responseData?.patient?.[0] ||
+      responseData?.report_id?.[0] ||
+      "Failed to create report";
+    throw new Error(detail);
   }
 
-  return res.json();
+  return responseData;
 }
 
 export async function fetchEncounterConsents(id: string) {
@@ -271,6 +287,28 @@ export async function searchPatients(search: string) {
   return res.json();
 }
 
+
+export async function updatePatient(id: string, data: any) {
+  const res = await fetch(`${API_URL}/patients/${id}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      responseData?.detail ||
+      responseData?.non_field_errors?.[0] ||
+      responseData?.consent_status?.[0] ||
+      "Failed to update patient.";
+    throw new Error(detail);
+  }
+
+  return responseData;
+}
 export async function filterEncounters(params: {
   search?: string;
   status?: string;

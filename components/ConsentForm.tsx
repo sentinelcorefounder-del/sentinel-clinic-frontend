@@ -8,13 +8,18 @@ import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 type Props = {
   encounterId: number;
   patientId: number;
+  onConsentSaved?: () => void | Promise<void>;
 };
 
 type ConsentStatus = "granted" | "declined" | "withdrawn" | "expired" | "";
 
 const ALLOWED_CONSENT_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
 
-export default function ConsentForm({ encounterId, patientId }: Props) {
+export default function ConsentForm({
+  encounterId,
+  patientId,
+  onConsentSaved,
+}: Props) {
   const router = useRouter();
 
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -117,6 +122,10 @@ export default function ConsentForm({ encounterId, patientId }: Props) {
         );
       }
 
+      if (onConsentSaved) {
+        await onConsentSaved();
+      }
+
       setMessage("Consent records saved successfully.");
 
       setCareDelivery("granted");
@@ -138,7 +147,7 @@ export default function ConsentForm({ encounterId, patientId }: Props) {
 
   if (authLoading) {
     return (
-      <div className="space-y-2 border rounded-lg p-4">
+      <div className="space-y-2 rounded-lg border p-4">
         <h2 className="text-xl font-semibold">Record Consents</h2>
         <p className="text-sm text-gray-600">Checking permissions...</p>
       </div>
@@ -149,7 +158,7 @@ export default function ConsentForm({ encounterId, patientId }: Props) {
 
   if (!allowed) {
     return (
-      <div className="space-y-2 border rounded-lg p-4 bg-gray-50">
+      <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
         <h2 className="text-xl font-semibold">Record Consents</h2>
         <p className="text-sm text-gray-600">
           You do not have permission to record consent entries.
@@ -162,14 +171,14 @@ export default function ConsentForm({ encounterId, patientId }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 border rounded-lg p-4">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-4">
       <h2 className="text-xl font-semibold">Record Consents</h2>
 
       <input
         type="date"
         value={consentDate}
         onChange={(e) => setConsentDate(e.target.value)}
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
         required
       />
 
@@ -177,14 +186,14 @@ export default function ConsentForm({ encounterId, patientId }: Props) {
         value={capturedBy}
         onChange={(e) => setCapturedBy(e.target.value)}
         placeholder="Captured By"
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
       />
 
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Notes"
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -215,7 +224,7 @@ export default function ConsentForm({ encounterId, patientId }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-black text-white px-4 py-3"
+        className="rounded-lg bg-black px-4 py-3 text-white"
       >
         {loading ? "Saving..." : "Save Consents"}
       </button>
@@ -238,7 +247,7 @@ function ConsentSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as ConsentStatus)}
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
       >
         <option value="">Not recorded</option>
         <option value="granted">Granted</option>
