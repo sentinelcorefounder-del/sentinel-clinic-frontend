@@ -7,6 +7,7 @@ export type CurrentUser = {
   email: string;
   is_staff: boolean;
   is_superuser: boolean;
+  must_change_password: boolean;
   roles: string[];
 };
 

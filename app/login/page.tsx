@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { login, getMe } from "@/lib/auth";
@@ -24,7 +25,12 @@ function LoginPageContent() {
     setLoading(true);
 
     try {
-      await login(username, password);
+      const user = await login(username, password);
+
+      if (user.must_change_password) {
+        window.location.href = "/change-password";
+        return;
+      }
 
       const me = await getMe();
       if (!me) {
@@ -40,10 +46,10 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md space-y-4 rounded-2xl border p-6 shadow-sm"
+        className="w-full max-w-md space-y-4 rounded-2xl border p-6 shadow-sm bg-white"
       >
         <h1 className="text-2xl font-semibold">Sentinel Login</h1>
 
@@ -52,6 +58,7 @@ function LoginPageContent() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          required
         />
 
         <input
@@ -60,14 +67,21 @@ function LoginPageContent() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
+
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+            Forgot password?
+          </Link>
+        </div>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl border px-4 py-2"
+          className="w-full rounded-xl bg-black text-white px-4 py-2"
         >
           {loading ? "Signing in..." : "Sign in"}
         </button>
@@ -78,7 +92,13 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-6">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-6">
+          Loading...
+        </div>
+      }
+    >
       <LoginPageContent />
     </Suspense>
   );

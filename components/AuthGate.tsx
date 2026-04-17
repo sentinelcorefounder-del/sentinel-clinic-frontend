@@ -14,7 +14,9 @@ export default function AuthGate({
 
   useEffect(() => {
     async function checkAuth() {
-      if (pathname === "/login") {
+      const publicPaths = ["/login", "/forgot-password", "/reset-password"];
+
+      if (publicPaths.includes(pathname)) {
         setChecked(true);
         return;
       }
@@ -24,6 +26,16 @@ export default function AuthGate({
 
         if (!user) {
           window.location.href = `/login?next=${encodeURIComponent(pathname)}`;
+          return;
+        }
+
+        if (user.must_change_password && pathname !== "/change-password") {
+          window.location.href = "/change-password";
+          return;
+        }
+
+        if (!user.must_change_password && pathname === "/change-password") {
+          window.location.href = "/dashboard";
           return;
         }
 
@@ -37,7 +49,9 @@ export default function AuthGate({
     checkAuth();
   }, [pathname]);
 
-  if (!checked && pathname !== "/login") {
+  const publicPaths = ["/login", "/forgot-password", "/reset-password"];
+
+  if (!checked && !publicPaths.includes(pathname)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-sm text-gray-700">Loading...</p>
