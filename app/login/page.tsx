@@ -58,10 +58,21 @@ function LoginPageContent() {
       >
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold text-slate-950">
-            Sentinel Login
+            Sentinel Sign In
           </h1>
           <p className="text-sm text-slate-700">
-            Sign in to access clinic or hospital workflows.
+            Sign in to access hospital or clinic workflows.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800">
+            New hospital or clinic?
+          </p>
+          <p className="mt-1 text-sm leading-6 text-amber-900">
+            Access is only available to organizations that have already been
+            onboarded by Sentinel. If your hospital or clinic is new and needs
+            access, please contact Sentinel for onboarding before trying to sign in.
           </p>
         </div>
 
@@ -91,7 +102,9 @@ function LoginPageContent() {
           </Link>
         </div>
 
-        {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+        {error ? (
+          <p className="text-sm font-medium text-red-700">{error}</p>
+        ) : null}
 
         <button
           type="submit"
