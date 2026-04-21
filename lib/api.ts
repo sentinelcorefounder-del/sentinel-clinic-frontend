@@ -162,6 +162,31 @@ export async function createReport(data: any) {
   return responseData;
 }
 
+export async function submitReportToOps(reportId: string | number) {
+  const res = await fetch(`${API_URL}/reports/${reportId}/submit-to-ops/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify({}),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      responseData?.detail ||
+      responseData?.non_field_errors?.[0] ||
+      "Failed to submit report to Ops.";
+    throw new Error(detail);
+  }
+
+  return responseData;
+}
+
+export function getReportPdfUrl(reportId: string | number) {
+  return `${API_URL}/reports/${reportId}/pdf/`;
+}
+
 export async function fetchEncounterConsents(id: string) {
   const res = await fetch(`${API_URL}/consents/encounter/${id}/`, {
     cache: "no-store",
@@ -279,7 +304,6 @@ export async function searchPatients(search: string) {
   return res.json();
 }
 
-
 export async function updatePatient(id: string, data: any) {
   const res = await fetch(`${API_URL}/patients/${id}/`, {
     method: "PATCH",
@@ -301,6 +325,7 @@ export async function updatePatient(id: string, data: any) {
 
   return responseData;
 }
+
 export async function filterEncounters(params: {
   search?: string;
   status?: string;
@@ -320,6 +345,108 @@ export async function filterEncounters(params: {
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to filter encounters: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchHospitalDashboardSummary() {
+  const res = await fetch(`${API_URL}/referrals/hospital/dashboard/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch hospital dashboard summary: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchHospitalReferrals() {
+  const res = await fetch(`${API_URL}/referrals/hospital/referrals/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch hospital referrals: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchHospitalReferralById(id: string) {
+  const res = await fetch(`${API_URL}/referrals/hospital/referrals/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch hospital referral: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchHospitalPayouts() {
+  const res = await fetch(`${API_URL}/referrals/hospital/payouts/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch hospital payouts: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function submitHospitalReferral(data: {
+  patient_id: string;
+  first_name: string;
+  last_name: string;
+  dob: string;
+  patient_sex: string;
+  hospital_mrn?: string;
+  diabetes_type: string;
+  reason_for_referral: string;
+  phone_number?: string;
+  email?: string;
+  notes?: string;
+}) {
+  const res = await fetch(`${API_URL}/referrals/hospital/submit/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      responseData?.detail ||
+      responseData?.error ||
+      "Failed to submit hospital referral.";
+    throw new Error(detail);
+  }
+
+  return responseData;
+}
+export async function fetchHospitalSubmissions() {
+  const res = await fetch(`${API_URL}/referrals/hospital/submissions/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch hospital submissions: ${res.status} ${text}`);
   }
 
   return res.json();

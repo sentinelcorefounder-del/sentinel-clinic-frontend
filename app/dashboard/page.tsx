@@ -13,9 +13,9 @@ function StatCard({
   value: number;
 }) {
   return (
-    <div className="border rounded-xl p-5 bg-white shadow-sm">
-      <p className="text-sm text-gray-500 mb-2">{title}</p>
-      <p className="text-3xl font-bold text-gray-900">{value}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="mb-2 text-sm font-medium text-slate-700">{title}</p>
+      <p className="text-3xl font-bold text-slate-950">{value}</p>
     </div>
   );
 }
@@ -43,16 +43,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen p-10 bg-gray-50">
-        <p className="text-sm text-gray-700">Loading dashboard...</p>
+      <main className="min-h-screen bg-slate-100 p-10">
+        <p className="text-sm font-medium text-slate-700">Loading dashboard...</p>
       </main>
     );
   }
 
   if (error || !summary) {
     return (
-      <main className="min-h-screen p-10 bg-gray-50">
-        <p className="text-sm text-red-600">
+      <main className="min-h-screen bg-slate-100 p-10">
+        <p className="text-sm font-medium text-red-700">
           {error || "Dashboard unavailable."}
         </p>
       </main>
@@ -60,23 +60,23 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen p-10 bg-gray-50">
-      <div className="flex items-center justify-between mb-8">
+    <main className="min-h-screen bg-slate-100 p-10">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Sentinel Dashboard</h1>
-          <p className="text-gray-600 mt-1">Clinic operations overview</p>
+          <h1 className="text-3xl font-bold text-slate-950">Clinic Dashboard</h1>
+          <p className="mt-1 text-slate-700">Clinic operations overview</p>
         </div>
 
         <div className="flex gap-3">
           <Link
             href="/patients"
-            className="rounded-lg bg-black text-white px-4 py-2"
+            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium !text-white hover:bg-slate-800"
           >
             Patients
           </Link>
           <Link
             href="/encounters"
-            className="rounded-lg border px-4 py-2"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
           >
             Encounters
           </Link>

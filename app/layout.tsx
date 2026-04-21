@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sentinel Clinic Portal",
-  description: "Sentinel diabetic eye screening clinic portal",
+  title: "Sentinel Portal",
+  description: "Sentinel diabetic eye screening portal",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-gray-50">
+      <body className="min-h-full flex flex-col bg-slate-100 text-slate-950">
         <AuthGate>
           <CurrentUserBar />
           <div className="flex-1">{children}</div>

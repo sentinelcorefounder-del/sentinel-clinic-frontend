@@ -1,6 +1,15 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+export type UserOrganization = {
+  id: number;
+  name: string;
+  clinic_id: string;
+  organization_type: "clinic" | "hospital" | "sentinel";
+  contact_email: string;
+  is_active: boolean;
+};
+
 export type CurrentUser = {
   id: number;
   username: string;
@@ -9,6 +18,7 @@ export type CurrentUser = {
   is_superuser: boolean;
   must_change_password: boolean;
   roles: string[];
+  organization: UserOrganization | null;
 };
 
 export async function ensureCsrf() {
@@ -100,4 +110,19 @@ export function hasAnyRole(
   if (user.is_superuser) return true;
 
   return user.roles?.some((role) => allowedRoles.includes(role)) ?? false;
+}
+
+export function isHospitalUser(user: CurrentUser | null) {
+  if (!user) return false;
+  if (user.is_superuser) return false;
+  return (
+    user.organization?.organization_type === "hospital" ||
+    hasAnyRole(user, ["hospital_admin"])
+  );
+}
+
+export function isClinicUser(user: CurrentUser | null) {
+  if (!user) return false;
+  if (user.is_superuser) return true;
+  return user.organization?.organization_type === "clinic";
 }

@@ -3,11 +3,11 @@ import EncountersTable from "@/components/EncountersTable";
 
 export default function EncountersPage() {
   return (
-    <main className="p-10">
-      <div className="flex items-start justify-between mb-6 gap-4">
+    <main className="min-h-screen bg-slate-100 p-10">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Screening Encounters</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-slate-950">Screening Encounters</h1>
+          <p className="mt-1 text-sm text-slate-700">
             Create and manage screening encounters for patients already assigned
             through Sentinel Ops.
           </p>
@@ -15,7 +15,7 @@ export default function EncountersPage() {
 
         <Link
           href="/encounters/new"
-          className="rounded-lg bg-black text-white px-4 py-2"
+          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium !text-white hover:bg-slate-800"
         >
           Create Encounter
         </Link>

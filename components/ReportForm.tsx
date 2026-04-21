@@ -2,29 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createReport } from "@/lib/api";
+import { createReport, getReportPdfUrl, submitReportToOps } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 
 type Props = {
   encounterId: number;
   patientId: number;
   patientConsentStatus: string;
+  onReportCreated?: () => Promise<void> | void;
 };
 
 type CreatedReport = {
   id: number;
   report_id: string;
+  report_status?: string;
 };
 
 const ALLOWED_REPORT_ROLES = ["reviewer", "clinic_admin", "super_admin"];
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 
 export default function ReportForm({
   encounterId,
   patientId,
   patientConsentStatus,
+  onReportCreated,
 }: Props) {
   const router = useRouter();
 
@@ -48,6 +49,7 @@ export default function ReportForm({
   });
 
   const [loading, setLoading] = useState(false);
+  const [submittingToOps, setSubmittingToOps] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -80,18 +82,14 @@ export default function ReportForm({
         [fieldName]: value,
       };
 
-      // If marked ungradable, force retake outcome
       if (fieldName === "ungradable" && value === true) {
         next.urgency_outcome = "image_retake";
       }
 
-      // If retake outcome chosen, force ungradable true
       if (fieldName === "urgency_outcome" && value === "image_retake") {
         next.ungradable = true;
       }
 
-      // Optional: if user changes outcome away from image_retake,
-      // do not auto-uncheck ungradable, let them decide manually.
       return next;
     });
   }
@@ -100,7 +98,7 @@ export default function ReportForm({
     if (!createdReport?.id) return;
 
     window.open(
-      `${API_BASE}/api/reports/${createdReport.id}/pdf/`,
+      getReportPdfUrl(createdReport.id),
       "_blank",
       "noopener,noreferrer"
     );
@@ -126,6 +124,7 @@ export default function ReportForm({
       setCreatedReport({
         id: created.id,
         report_id: created.report_id,
+        report_status: created.report_status,
       });
 
       setMessage("Report created successfully.");
@@ -139,15 +138,63 @@ export default function ReportForm({
         recommendation: "",
         next_followup_interval: "",
         notes: "",
+        report_status: "draft",
+        urgency_outcome: "routine_followup",
+        ungradable: false,
       }));
+
+      if (onReportCreated) {
+        await onReportCreated();
+      }
 
       router.refresh();
     } catch (error) {
-      const message =
+      const nextMessage =
         error instanceof Error ? error.message : "Failed to create report.";
-      setMessage(message);
+      setMessage(nextMessage);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSubmitToOps() {
+    if (!createdReport?.id) return;
+
+    const allowed = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
+
+    if (!allowed) {
+      setMessage("You do not have permission to submit reports to Ops.");
+      return;
+    }
+
+    try {
+      setSubmittingToOps(true);
+      setMessage("");
+
+      const response = await submitReportToOps(createdReport.id);
+
+      setCreatedReport((prev) =>
+        prev
+          ? {
+              ...prev,
+              report_status: response.report_status ?? "submitted_to_ops",
+            }
+          : prev
+      );
+
+      setMessage("Report submitted to Ops successfully.");
+
+      if (onReportCreated) {
+        await onReportCreated();
+      }
+
+      router.refresh();
+    } catch (error) {
+      const nextMessage =
+        error instanceof Error ? error.message : "Failed to submit report to Ops.";
+      setMessage(nextMessage);
+    } finally {
+      setSubmittingToOps(false);
     }
   }
 
@@ -192,6 +239,17 @@ export default function ReportForm({
       </div>
     );
   }
+
+  const canSubmitCreatedReportToOps =
+    !!createdReport &&
+    hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES) &&
+    ["draft", "under_review", "signed_off", undefined].includes(
+      createdReport.report_status as
+        | "draft"
+        | "under_review"
+        | "signed_off"
+        | undefined
+    );
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
@@ -242,7 +300,7 @@ export default function ReportForm({
           Ungradable
         </label>
 
-                <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500">
           If no usable image is available, the report will be marked for image retake.
         </p>
 
@@ -297,18 +355,18 @@ export default function ReportForm({
           rows={4}
         />
 
-        {message && <p className="text-sm">{message}</p>}
+        {message ? <p className="text-sm">{message}</p> : null}
 
         <div className="flex flex-wrap gap-3">
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-black px-4 py-3 text-white"
+            className="rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50"
           >
             {loading ? "Saving..." : "Create Report"}
           </button>
 
-          {createdReport && (
+          {createdReport ? (
             <button
               type="button"
               onClick={handleGeneratePdf}
@@ -316,14 +374,32 @@ export default function ReportForm({
             >
               Generate PDF
             </button>
-          )}
+          ) : null}
+
+          {canSubmitCreatedReportToOps ? (
+            <button
+              type="button"
+              onClick={handleSubmitToOps}
+              disabled={submittingToOps}
+              className="rounded-lg bg-emerald-600 px-4 py-3 text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {submittingToOps ? "Submitting..." : "Submit to Ops"}
+            </button>
+          ) : null}
         </div>
 
-        {createdReport && (
-          <p className="text-sm text-gray-600">
-            PDF ready for report: {createdReport.report_id}
-          </p>
-        )}
+        {createdReport ? (
+          <div className="space-y-1">
+            <p className="text-sm text-gray-600">
+              PDF ready for report: {createdReport.report_id}
+            </p>
+            {createdReport.report_status ? (
+              <p className="text-xs text-gray-500">
+                Current workflow status: {createdReport.report_status}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </form>
     </div>
   );
