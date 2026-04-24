@@ -11,6 +11,9 @@ import {
   updatePatient,
   getReportPdfUrl,
   submitReportToOps,
+  createDatasetLabel,
+  updateDatasetLabel,
+  getDatasetExportUrl,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter } from "@/types/encounter";
@@ -25,10 +28,242 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+type DatasetLabelFormProps = {
+  upload: any;
+  patientConsentStatus?: string;
+  onSaved: () => Promise<void> | void;
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
+
+function DatasetLabelForm({
+  upload,
+  patientConsentStatus,
+  onSaved,
+}: DatasetLabelFormProps) {
+  const existingLabel = upload.dataset_label;
+
+  const [imageQualityLabel, setImageQualityLabel] = useState(
+    existingLabel?.image_quality_label || upload.image_quality || "good"
+  );
+  const [drGrade, setDrGrade] = useState(existingLabel?.dr_grade || "no_dr");
+  const [maculopathyGrade, setMaculopathyGrade] = useState(
+    existingLabel?.maculopathy_grade || "unknown"
+  );
+  const [referable, setReferable] = useState(Boolean(existingLabel?.referable));
+  const [referralUrgency, setReferralUrgency] = useState(
+    existingLabel?.referral_urgency || "routine"
+  );
+  const [clinicianNotes, setClinicianNotes] = useState(
+    existingLabel?.clinician_notes || ""
+  );
+  const [otherFindings, setOtherFindings] = useState(
+    existingLabel?.other_findings || ""
+  );
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const consentCompleted = patientConsentStatus === "completed";
+
+  useEffect(() => {
+    setImageQualityLabel(existingLabel?.image_quality_label || upload.image_quality || "good");
+    setDrGrade(existingLabel?.dr_grade || "no_dr");
+    setMaculopathyGrade(existingLabel?.maculopathy_grade || "unknown");
+    setReferable(Boolean(existingLabel?.referable));
+    setReferralUrgency(existingLabel?.referral_urgency || "routine");
+    setClinicianNotes(existingLabel?.clinician_notes || "");
+    setOtherFindings(existingLabel?.other_findings || "");
+  }, [existingLabel, upload.image_quality]);
+
+  async function handleSaveDatasetLabel(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!consentCompleted) {
+      setMessage("Dataset label cannot be saved because patient consent is not completed.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    const payload = {
+      image_upload: upload.id,
+      image_quality_label: imageQualityLabel,
+      dr_grade: drGrade,
+      maculopathy_grade: maculopathyGrade,
+      referable,
+      referral_urgency: referralUrgency,
+      clinician_notes: clinicianNotes,
+      other_findings: otherFindings,
+    };
+
+    try {
+      if (existingLabel?.id) {
+        await updateDatasetLabel(existingLabel.id, payload);
+        setMessage("Dataset label updated successfully.");
+      } else {
+        await createDatasetLabel(payload);
+        setMessage("Dataset label saved successfully.");
+      }
+
+      await onSaved();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to save dataset label.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSaveDatasetLabel} className="rounded-lg border bg-white p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">Dataset Label / Clinician Ground Truth</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            Saved labels become consented training data for Sentinel model improvement.
+          </p>
+        </div>
+
+        {existingLabel ? (
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            Labelled
+          </span>
+        ) : (
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            Not labelled
+          </span>
+        )}
+      </div>
+
+      {!consentCompleted ? (
+        <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Dataset labelling is disabled because patient consent is not completed.
+          Only consented patient data can be added to the dataset.
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Image quality label</span>
+          <select
+            value={imageQualityLabel}
+            onChange={(e) => setImageQualityLabel(e.target.value)}
+            disabled={!consentCompleted || saving}
+            className="w-full rounded border p-2"
+          >
+            <option value="good">Good</option>
+            <option value="acceptable">Acceptable</option>
+            <option value="poor">Poor</option>
+            <option value="ungradable">Ungradable</option>
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Final DR grade</span>
+          <select
+            value={drGrade}
+            onChange={(e) => setDrGrade(e.target.value)}
+            disabled={!consentCompleted || saving}
+            className="w-full rounded border p-2"
+          >
+            <option value="no_dr">No DR</option>
+            <option value="mild_npdr">Mild NPDR</option>
+            <option value="moderate_npdr">Moderate NPDR</option>
+            <option value="severe_npdr">Severe NPDR</option>
+            <option value="pdr">Proliferative DR</option>
+            <option value="ungradable">Ungradable</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Maculopathy grade</span>
+          <select
+            value={maculopathyGrade}
+            onChange={(e) => setMaculopathyGrade(e.target.value)}
+            disabled={!consentCompleted || saving}
+            className="w-full rounded border p-2"
+          >
+            <option value="m0">M0 - No maculopathy</option>
+            <option value="m1">M1 - Maculopathy present / suspected</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Referral urgency</span>
+          <select
+            value={referralUrgency}
+            onChange={(e) => setReferralUrgency(e.target.value)}
+            disabled={!consentCompleted || saving}
+            className="w-full rounded border p-2"
+          >
+            <option value="routine">Routine</option>
+            <option value="priority">Priority</option>
+            <option value="urgent">Urgent</option>
+            <option value="not_required">Not Required</option>
+          </select>
+        </label>
+      </div>
+
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={referable}
+          onChange={(e) => setReferable(e.target.checked)}
+          disabled={!consentCompleted || saving}
+        />
+        Referable after clinician review
+      </label>
+
+      <label className="mt-3 block space-y-1 text-sm">
+        <span className="font-medium">Clinician notes</span>
+        <textarea
+          value={clinicianNotes}
+          onChange={(e) => setClinicianNotes(e.target.value)}
+          disabled={!consentCompleted || saving}
+          className="min-h-[90px] w-full rounded border p-2"
+          placeholder="Clinician-confirmed findings, grading rationale, lesion description..."
+        />
+      </label>
+
+      <label className="mt-3 block space-y-1 text-sm">
+        <span className="font-medium">Other findings</span>
+        <textarea
+          value={otherFindings}
+          onChange={(e) => setOtherFindings(e.target.value)}
+          disabled={!consentCompleted || saving}
+          className="min-h-[70px] w-full rounded border p-2"
+          placeholder="Other non-DR observations, artefacts, media opacity, glaucoma suspicion, AMD suspicion, etc."
+        />
+      </label>
+
+      {existingLabel ? (
+        <div className="mt-3 rounded bg-slate-50 p-3 text-xs text-slate-600">
+          <p><strong>Label ID:</strong> {existingLabel.label_id}</p>
+          <p><strong>Labelled by:</strong> {existingLabel.labelled_by_username || "-"}</p>
+          <p><strong>Labelled at:</strong> {existingLabel.labelled_at || "-"}</p>
+          <p><strong>Consent confirmed:</strong> {existingLabel.consent_confirmed ? "Yes" : "No"}</p>
+        </div>
+      ) : null}
+
+      {message ? (
+        <p className="mt-3 rounded bg-slate-50 p-3 text-sm text-gray-700">{message}</p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={!consentCompleted || saving}
+        className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {saving ? "Saving..." : existingLabel ? "Update Dataset Label" : "Save Dataset Label"}
+      </button>
+    </form>
+  );
+}
 
 export default function EncounterDetailPage({ params }: Props) {
   const [id, setId] = useState<string>("");
@@ -79,10 +314,14 @@ export default function EncounterDetailPage({ params }: Props) {
     resolveParamsAndLoad();
   }, [params]);
 
-  async function handleImageUploaded() {
+  async function refreshUploads() {
     if (!encounter?.id) return;
     const refreshedUploads = await fetchEncounterUploads(String(encounter.id));
     setUploads(refreshedUploads);
+  }
+
+  async function handleImageUploaded() {
+    await refreshUploads();
   }
 
   async function handleConsentSaved() {
@@ -139,6 +378,12 @@ export default function EncounterDetailPage({ params }: Props) {
   function resolveFileUrl(fileUrl?: string | null) {
     if (!fileUrl) return "";
     return fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl}`;
+  }
+
+  function displayProvider(provider?: string | null) {
+    if (provider === "openai") return "OpenAI";
+    if (provider === "hybrid") return "Hybrid AI";
+    return "Sentinel AI";
   }
 
   const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
@@ -209,7 +454,23 @@ export default function EncounterDetailPage({ params }: Props) {
       />
 
       <section className="rounded-lg border p-6">
-        <h2 className="mb-4 text-xl font-semibold">Uploaded Images</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">Uploaded Images</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              AI analysis and consent-gated clinician dataset labelling.
+            </p>
+          </div>
+
+          <a
+            href={getDatasetExportUrl()}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Export Dataset CSV
+          </a>
+        </div>
 
         {uploads.length === 0 ? (
           <p>No images uploaded yet.</p>
@@ -243,8 +504,7 @@ export default function EncounterDetailPage({ params }: Props) {
                     ) : (
                       <div className="space-y-2 text-sm">
                         <p>
-                          <strong>Provider:</strong>{" "}
-                          {ai.provider === "openai" ? "OpenAI" : "Sentinel AI"}
+                          <strong>Provider:</strong> {displayProvider(ai.provider)}
                         </p>
                         <p><strong>Status:</strong> {ai.ai_status || "-"}</p>
                         <p><strong>Fundus Status:</strong> {ai.fundus_status || "-"}</p>
@@ -335,12 +595,18 @@ export default function EncounterDetailPage({ params }: Props) {
                         ) : null}
 
                         <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">
-                          {upload.ai_analysis?.disclaimer ||
+                          {ai.disclaimer ||
                             "AI output is for clinician review only and must not be treated as a final diagnosis."}
                         </p>
                       </div>
                     )}
                   </div>
+
+                  <DatasetLabelForm
+                    upload={upload}
+                    patientConsentStatus={patient.consent_status}
+                    onSaved={refreshUploads}
+                  />
                 </div>
               );
             })}
