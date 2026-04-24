@@ -79,6 +79,12 @@ export default function EncounterDetailPage({ params }: Props) {
     resolveParamsAndLoad();
   }, [params]);
 
+  async function handleImageUploaded() {
+    if (!encounter?.id) return;
+    const refreshedUploads = await fetchEncounterUploads(String(encounter.id));
+    setUploads(refreshedUploads);
+  }
+
   async function handleConsentSaved() {
     if (!patient?.id || !encounter?.id) return;
 
@@ -130,6 +136,11 @@ export default function EncounterDetailPage({ params }: Props) {
     return ["draft", "under_review", "signed_off"].includes(reportStatus || "");
   }
 
+  function resolveFileUrl(fileUrl?: string | null) {
+    if (!fileUrl) return "";
+    return fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl}`;
+  }
+
   const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
 
   if (loading) {
@@ -168,10 +179,7 @@ export default function EncounterDetailPage({ params }: Props) {
             >
               View Patient
             </Link>
-            <Link
-              href="/encounters"
-              className="rounded-lg border px-4 py-2"
-            >
+            <Link href="/encounters" className="rounded-lg border px-4 py-2">
               Back to Encounters
             </Link>
           </div>
@@ -194,7 +202,11 @@ export default function EncounterDetailPage({ params }: Props) {
         </div>
       </section>
 
-      <ImageUploadForm encounterId={encounter.id} patientId={encounter.patient} />
+      <ImageUploadForm
+        encounterId={encounter.id}
+        patientId={encounter.patient}
+        onUploadSuccess={handleImageUploaded}
+      />
 
       <section className="rounded-lg border p-6">
         <h2 className="mb-4 text-xl font-semibold">Uploaded Images</h2>
@@ -203,26 +215,134 @@ export default function EncounterDetailPage({ params }: Props) {
           <p>No images uploaded yet.</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {uploads.map((upload) => (
-              <div key={upload.id} className="space-y-3 rounded-lg border p-4">
-                <div className="space-y-1 text-sm">
-                  <p><strong>ID:</strong> {upload.image_upload_id}</p>
-                  <p><strong>Laterality:</strong> {upload.eye_laterality}</p>
-                  <p><strong>Type:</strong> {upload.image_type}</p>
-                  <p><strong>Quality:</strong> {upload.image_quality}</p>
-                </div>
+            {uploads.map((upload: any) => {
+              const ai = upload.ai_analysis;
 
-                <img
-                  src={
-                    upload.image_file.startsWith("http")
-                      ? upload.image_file
-                      : `${API_BASE_URL}${upload.image_file}`
-                  }
-                  alt={upload.image_upload_id}
-                  className="w-full rounded border"
-                />
-              </div>
-            ))}
+              return (
+                <div key={upload.id} className="space-y-4 rounded-lg border p-4">
+                  <div className="space-y-1 text-sm">
+                    <p><strong>ID:</strong> {upload.image_upload_id}</p>
+                    <p><strong>Laterality:</strong> {upload.eye_laterality}</p>
+                    <p><strong>Type:</strong> {upload.image_type}</p>
+                    <p><strong>Quality:</strong> {upload.image_quality}</p>
+                  </div>
+
+                  <img
+                    src={resolveFileUrl(upload.image_file)}
+                    alt={upload.image_upload_id}
+                    className="w-full rounded border"
+                  />
+
+                  <div className="rounded-lg border bg-slate-50 p-4">
+                    <h3 className="mb-3 text-lg font-semibold">AI Suggestion</h3>
+
+                    {!ai ? (
+                      <p className="text-sm text-gray-600">
+                        No AI analysis available yet. Refresh shortly if the image was just uploaded.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 text-sm">
+                        <p>
+                          <strong>Provider:</strong>{" "}
+                          {ai.provider === "openai" ? "OpenAI" : "Sentinel AI"}
+                        </p>
+                        <p><strong>Status:</strong> {ai.ai_status || "-"}</p>
+                        <p><strong>Fundus Status:</strong> {ai.fundus_status || "-"}</p>
+
+                        {ai.prediction ? (
+                          <p>
+                            <strong>Prediction / Observation:</strong>{" "}
+                            <span
+                              className={
+                                ai.prediction === "Referable DR"
+                                  ? "font-semibold text-red-700"
+                                  : ai.prediction === "No Referable DR"
+                                    ? "font-semibold text-emerald-700"
+                                    : "font-semibold text-gray-800"
+                              }
+                            >
+                              {ai.prediction}
+                            </span>
+                          </p>
+                        ) : null}
+
+                        {ai.referable !== null && ai.referable !== undefined ? (
+                          <p>
+                            <strong>Referable:</strong>{" "}
+                            {ai.referable ? "Yes" : "No"}
+                          </p>
+                        ) : null}
+
+                        {ai.confidence !== null && ai.confidence !== undefined ? (
+                          <p>
+                            <strong>Confidence:</strong>{" "}
+                            {(Number(ai.confidence) * 100).toFixed(1)}%
+                          </p>
+                        ) : null}
+
+                        {ai.severity_label ? (
+                          <p><strong>Severity Label:</strong> {ai.severity_label}</p>
+                        ) : null}
+
+                        {ai.image_quality ? (
+                          <p><strong>AI Image Quality:</strong> {ai.image_quality}</p>
+                        ) : null}
+
+                        {ai.risk_flag ? (
+                          <p><strong>Risk Flag:</strong> {ai.risk_flag}</p>
+                        ) : null}
+
+                        {ai.suggested_review_priority ? (
+                          <p>
+                            <strong>Suggested Review Priority:</strong>{" "}
+                            {ai.suggested_review_priority}
+                          </p>
+                        ) : null}
+
+                        {ai.message ? (
+                          <p><strong>Message:</strong> {ai.message}</p>
+                        ) : null}
+
+                        {ai.draft_note ? (
+                          <div className="rounded border bg-white p-3">
+                            <p className="mb-1 font-semibold">Draft Note</p>
+                            <p>{ai.draft_note}</p>
+                          </div>
+                        ) : null}
+
+                        {ai.heatmap_url ? (
+                          <div className="mt-3 space-y-2">
+                            <p className="font-semibold">AI Heatmap</p>
+                            <img
+                              src={resolveFileUrl(ai.heatmap_url)}
+                              alt="AI heatmap"
+                              className="w-full rounded border"
+                            />
+                          </div>
+                        ) : null}
+
+                        {ai.processed_image_url ? (
+                          <div className="mt-3">
+                            <a
+                              href={resolveFileUrl(ai.processed_image_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-700 underline"
+                            >
+                              View processed image
+                            </a>
+                          </div>
+                        ) : null}
+
+                        <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">
+                          AI output is for clinician review only and must not be treated as a final diagnosis.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

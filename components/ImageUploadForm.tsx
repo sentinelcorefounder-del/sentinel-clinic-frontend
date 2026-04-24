@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createImageUpload } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 
 type Props = {
   encounterId: number;
   patientId: number;
+  onUploadSuccess?: () => Promise<void> | void;
 };
 
 const ALLOWED_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
 
-export default function ImageUploadForm({ encounterId, patientId }: Props) {
-  const router = useRouter();
-
+export default function ImageUploadForm({
+  encounterId,
+  patientId,
+  onUploadSuccess,
+}: Props) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -58,7 +60,7 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
     }
 
     setLoading(true);
-    setMessage("");
+    setMessage("Uploading image and running AI analysis...");
 
     try {
       const formData = new FormData();
@@ -73,11 +75,14 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
       formData.append("image_file", file);
 
       await createImageUpload(formData);
-      setMessage("Upload successful.");
+
+      setMessage("Upload successful. AI suggestion is now available below.");
       setImageUploadId("");
       setFile(null);
 
-      router.refresh();
+      if (onUploadSuccess) {
+        await onUploadSuccess();
+      }
     } catch (error) {
       console.error(error);
       setMessage(error instanceof Error ? error.message : "Upload failed.");
@@ -88,7 +93,7 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
 
   if (authLoading) {
     return (
-      <div className="space-y-2 border rounded-lg p-4">
+      <div className="space-y-2 rounded-lg border p-4">
         <h2 className="text-xl font-semibold">Upload Retinal Image</h2>
         <p className="text-sm text-gray-600">Checking permissions...</p>
       </div>
@@ -99,7 +104,7 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
 
   if (!allowed) {
     return (
-      <div className="space-y-2 border rounded-lg p-4 bg-gray-50">
+      <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
         <h2 className="text-xl font-semibold">Upload Retinal Image</h2>
         <p className="text-sm text-gray-600">
           You do not have permission to upload retinal images.
@@ -112,21 +117,21 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 border rounded-lg p-4">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-4">
       <h2 className="text-xl font-semibold">Upload Retinal Image</h2>
 
       <input
         value={imageUploadId}
         onChange={(e) => setImageUploadId(e.target.value)}
         placeholder="Image Upload ID"
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
         required
       />
 
       <select
         value={eyeLaterality}
         onChange={(e) => setEyeLaterality(e.target.value)}
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
       >
         <option value="left">Left</option>
         <option value="right">Right</option>
@@ -135,7 +140,7 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
       <select
         value={imageType}
         onChange={(e) => setImageType(e.target.value)}
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
       >
         <option value="fundus">Fundus</option>
         <option value="oct">OCT</option>
@@ -145,7 +150,7 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
       <select
         value={imageQuality}
         onChange={(e) => setImageQuality(e.target.value)}
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
       >
         <option value="good">Good</option>
         <option value="acceptable">Acceptable</option>
@@ -175,18 +180,18 @@ export default function ImageUploadForm({ encounterId, patientId }: Props) {
         type="file"
         accept="image/*"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
-        className="w-full border rounded p-3"
+        className="w-full rounded border p-3"
         required
       />
 
-      {message && <p className="text-sm">{message}</p>}
+      {message && <p className="text-sm text-gray-700">{message}</p>}
 
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-black text-white px-4 py-3"
+        className="rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50"
       >
-        {loading ? "Uploading..." : "Upload Image"}
+        {loading ? "Uploading & analyzing..." : "Upload Image"}
       </button>
     </form>
   );
