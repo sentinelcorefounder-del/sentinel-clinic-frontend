@@ -50,6 +50,101 @@ export async function createPatient(data: any) {
   return res.json();
 }
 
+export async function fetchPatientById(id: string) {
+  const res = await fetch(`${API_URL}/patients/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch patient: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function updatePatient(id: string, data: any) {
+  const res = await fetch(`${API_URL}/patients/${id}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      responseData?.detail ||
+      responseData?.non_field_errors?.[0] ||
+      responseData?.consent_status?.[0] ||
+      "Failed to update patient.";
+    throw new Error(detail);
+  }
+
+  return responseData;
+}
+
+export async function searchPatients(search: string) {
+  const res = await fetch(
+    `${API_URL}/patients/?search=${encodeURIComponent(search)}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to search patients: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchPatientEncounters(id: string) {
+  const res = await fetch(`${API_URL}/encounters/patient/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch patient encounters: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchPatientReports(id: string) {
+  const res = await fetch(`${API_URL}/reports/patient/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch patient reports: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchPatientConsents(id: string) {
+  const res = await fetch(`${API_URL}/consents/patient/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch patient consents: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
 export async function fetchEncounters() {
   const res = await fetch(`${API_URL}/encounters/`, {
     cache: "no-store",
@@ -89,6 +184,30 @@ export async function fetchEncounterById(id: string) {
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to fetch encounter: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function filterEncounters(params: {
+  search?: string;
+  status?: string;
+  date?: string;
+}) {
+  const query = new URLSearchParams();
+
+  if (params.search) query.append("search", params.search);
+  if (params.status) query.append("status", params.status);
+  if (params.date) query.append("date", params.date);
+
+  const res = await fetch(`${API_URL}/encounters/?${query.toString()}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to filter encounters: ${res.status} ${text}`);
   }
 
   return res.json();
@@ -231,125 +350,6 @@ export async function fetchDashboardSummary() {
   return res.json();
 }
 
-export async function fetchPatientById(id: string) {
-  const res = await fetch(`${API_URL}/patients/${id}/`, {
-    cache: "no-store",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch patient: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
-export async function fetchPatientEncounters(id: string) {
-  const res = await fetch(`${API_URL}/encounters/patient/${id}/`, {
-    cache: "no-store",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch patient encounters: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
-export async function fetchPatientReports(id: string) {
-  const res = await fetch(`${API_URL}/reports/patient/${id}/`, {
-    cache: "no-store",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch patient reports: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
-export async function fetchPatientConsents(id: string) {
-  const res = await fetch(`${API_URL}/consents/patient/${id}/`, {
-    cache: "no-store",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch patient consents: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
-export async function searchPatients(search: string) {
-  const res = await fetch(
-    `${API_URL}/patients/?search=${encodeURIComponent(search)}`,
-    {
-      cache: "no-store",
-      credentials: "include",
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to search patients: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
-export async function updatePatient(id: string, data: any) {
-  const res = await fetch(`${API_URL}/patients/${id}/`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: await getCsrfHeaders(true),
-    body: JSON.stringify(data),
-  });
-
-  const responseData = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const detail =
-      responseData?.detail ||
-      responseData?.non_field_errors?.[0] ||
-      responseData?.consent_status?.[0] ||
-      "Failed to update patient.";
-    throw new Error(detail);
-  }
-
-  return responseData;
-}
-
-export async function filterEncounters(params: {
-  search?: string;
-  status?: string;
-  date?: string;
-}) {
-  const query = new URLSearchParams();
-
-  if (params.search) query.append("search", params.search);
-  if (params.status) query.append("status", params.status);
-  if (params.date) query.append("date", params.date);
-
-  const res = await fetch(`${API_URL}/encounters/?${query.toString()}`, {
-    cache: "no-store",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to filter encounters: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-
 export async function fetchHospitalDashboardSummary() {
   const res = await fetch(`${API_URL}/referrals/hospital/dashboard/`, {
     cache: "no-store",
@@ -406,6 +406,20 @@ export async function fetchHospitalPayouts() {
   return res.json();
 }
 
+export async function fetchHospitalSubmissions() {
+  const res = await fetch(`${API_URL}/referrals/hospital/submissions/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch hospital submissions: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
 export async function submitHospitalReferral(data: {
   patient_id: string;
   first_name: string;
@@ -437,64 +451,4 @@ export async function submitHospitalReferral(data: {
   }
 
   return responseData;
-}
-export async function fetchHospitalSubmissions() {
-  const res = await fetch(`${API_URL}/referrals/hospital/submissions/`, {
-    cache: "no-store",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch hospital submissions: ${res.status} ${text}`);
-  }
-
-  return res.json();
-}
-export async function createDatasetLabel(data: any) {
-  const res = await fetch(`${API_URL}/uploads/dataset-labels/`, {
-    method: "POST",
-    credentials: "include",
-    headers: await getCsrfHeaders(true),
-    body: JSON.stringify(data),
-  });
-
-  const responseData = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const detail =
-      responseData?.detail ||
-      responseData?.non_field_errors?.[0] ||
-      JSON.stringify(responseData) ||
-      "Failed to create dataset label.";
-    throw new Error(detail);
-  }
-
-  return responseData;
-}
-
-export async function updateDatasetLabel(labelId: number, data: any) {
-  const res = await fetch(`${API_URL}/uploads/dataset-labels/${labelId}/`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: await getCsrfHeaders(true),
-    body: JSON.stringify(data),
-  });
-
-  const responseData = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const detail =
-      responseData?.detail ||
-      responseData?.non_field_errors?.[0] ||
-      JSON.stringify(responseData) ||
-      "Failed to update dataset label.";
-    throw new Error(detail);
-  }
-
-  return responseData;
-}
-
-export function getDatasetExportUrl() {
-  return `${API_URL}/uploads/dataset-labels/export/`;
 }
