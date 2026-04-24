@@ -451,3 +451,50 @@ export async function fetchHospitalSubmissions() {
 
   return res.json();
 }
+export async function createDatasetLabel(data: any) {
+  const res = await fetch(`${API_URL}/uploads/dataset-labels/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      responseData?.detail ||
+      responseData?.non_field_errors?.[0] ||
+      JSON.stringify(responseData) ||
+      "Failed to create dataset label.";
+    throw new Error(detail);
+  }
+
+  return responseData;
+}
+
+export async function updateDatasetLabel(labelId: number, data: any) {
+  const res = await fetch(`${API_URL}/uploads/dataset-labels/${labelId}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      responseData?.detail ||
+      responseData?.non_field_errors?.[0] ||
+      JSON.stringify(responseData) ||
+      "Failed to update dataset label.";
+    throw new Error(detail);
+  }
+
+  return responseData;
+}
+
+export function getDatasetExportUrl() {
+  return `${API_URL}/uploads/dataset-labels/export/`;
+}
