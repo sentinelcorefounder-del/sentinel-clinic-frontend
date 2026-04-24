@@ -1,3 +1,50 @@
+export type AIAnalysis = {
+  id: number;
+  analysis_id: string;
+  provider: "openai" | "sentinel" | "hybrid" | string;
+  ai_status: string;
+  fundus_status: string | null;
+  prediction: string | null;
+  referable: boolean | null;
+  confidence: number | null;
+  severity: number | null;
+  severity_label: string | null;
+  image_quality: string | null;
+  risk_flag: string | null;
+  suggested_review_priority: string | null;
+  message: string | null;
+  draft_note: string | null;
+  disclaimer: string | null;
+  heatmap_url: string | null;
+  processed_image_url: string | null;
+  model_version: string | null;
+  analyzed_at: string | null;
+  created_at: string;
+};
+
+export type DatasetLabel = {
+  id: number;
+  label_id: string;
+  image_upload: number;
+  encounter: number;
+  patient: number;
+  consent_confirmed: boolean;
+  image_quality_label: string;
+  dr_grade: string;
+  maculopathy_grade: string;
+  referable: boolean;
+  referral_urgency: string;
+  clinician_notes: string;
+  other_findings: string;
+  ai_prediction_at_label_time: string;
+  ai_provider_at_label_time: string;
+  ai_confidence_at_label_time: number | null;
+  labelled_by: number | null;
+  labelled_by_username: string | null;
+  labelled_at: string;
+  created_at: string;
+};
+
 export type ImageUpload = {
   id: number;
   image_upload_id: string;
@@ -10,4 +57,6 @@ export type ImageUpload = {
   gradable: boolean;
   retake_required: boolean;
   uploaded_at: string;
+  ai_analysis?: AIAnalysis | null;
+  dataset_label?: DatasetLabel | null;
 };
