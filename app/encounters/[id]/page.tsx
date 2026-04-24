@@ -335,7 +335,8 @@ export default function EncounterDetailPage({ params }: Props) {
                         ) : null}
 
                         <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">
-                          AI output is for clinician review only and must not be treated as a final diagnosis.
+                          {upload.ai_analysis?.disclaimer ||
+                            "AI output is for clinician review only and must not be treated as a final diagnosis."}
                         </p>
                       </div>
                     )}
