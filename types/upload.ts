@@ -28,17 +28,39 @@ export type DatasetLabel = {
   image_upload: number;
   encounter: number;
   patient: number;
+
+  eye_laterality: string;
   consent_confirmed: boolean;
   image_quality_label: string;
+
+  unaided_visual_acuity: string;
+  corrected_visual_acuity: string;
+
   dr_grade: string;
   maculopathy_grade: string;
+
+  diabetic_referable: boolean;
+  vision_referral_needed: boolean;
+  vision_referral_reason: string;
+
   referable: boolean;
   referral_urgency: string;
+
   clinician_notes: string;
   other_findings: string;
+
   ai_prediction_at_label_time: string;
   ai_provider_at_label_time: string;
   ai_confidence_at_label_time: number | null;
+  ai_referable_at_label_time: boolean | null;
+
+  report_status_at_label_time: string;
+  quality_score: number | null;
+  quality_flag: string | null;
+  ai_clinician_agreement: boolean | null;
+  disagreement_flag: string | null;
+  label_source: string;
+
   labelled_by: number | null;
   labelled_by_username: string | null;
   labelled_at: string;

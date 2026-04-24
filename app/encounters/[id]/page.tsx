@@ -11,6 +11,7 @@ import {
   updatePatient,
   getReportPdfUrl,
   submitReportToOps,
+  deleteImageUpload,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter } from "@/types/encounter";
@@ -29,6 +30,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
+const ALLOWED_DELETE_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
 
 export default function EncounterDetailPage({ params }: Props) {
   const [id, setId] = useState<string>("");
@@ -41,7 +43,9 @@ export default function EncounterDetailPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reportActionMessage, setReportActionMessage] = useState("");
+  const [uploadActionMessage, setUploadActionMessage] = useState("");
   const [submittingReportId, setSubmittingReportId] = useState<number | null>(null);
+  const [deletingUploadId, setDeletingUploadId] = useState<number | null>(null);
 
   async function loadEncounterPage(encounterId: string) {
     const encounterData: Encounter = await fetchEncounterById(encounterId);
@@ -87,6 +91,37 @@ export default function EncounterDetailPage({ params }: Props) {
 
   async function handleImageUploaded() {
     await refreshUploads();
+  }
+
+  async function handleDeleteUpload(uploadId: number) {
+    const allowed = hasAnyRole(currentUser, ALLOWED_DELETE_UPLOAD_ROLES);
+
+    if (!allowed) {
+      setUploadActionMessage("You do not have permission to delete uploaded images.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this image? This will remove the uploaded image, AI analysis, and any linked dataset label for this image."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingUploadId(uploadId);
+      setUploadActionMessage("");
+
+      await deleteImageUpload(uploadId);
+      await refreshUploads();
+
+      setUploadActionMessage("Image deleted successfully. You can now upload a replacement for that eye.");
+    } catch (err) {
+      const nextMessage =
+        err instanceof Error ? err.message : "Failed to delete image.";
+      setUploadActionMessage(nextMessage);
+    } finally {
+      setDeletingUploadId(null);
+    }
   }
 
   async function handleConsentSaved() {
@@ -151,7 +186,13 @@ export default function EncounterDetailPage({ params }: Props) {
     return "Sentinel AI";
   }
 
+  function displayValue(value?: string | null) {
+    if (!value) return "-";
+    return value.replaceAll("_", " ");
+  }
+
   const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
+  const canDeleteUploads = hasAnyRole(currentUser, ALLOWED_DELETE_UPLOAD_ROLES);
 
   if (loading) {
     return (
@@ -207,14 +248,15 @@ export default function EncounterDetailPage({ params }: Props) {
           <p><strong>Status:</strong> {encounter.screening_status}</p>
           <p><strong>Type:</strong> {encounter.encounter_type}</p>
           <p><strong>Consent Status:</strong> {patient.consent_status || "-"}</p>
-          <p><strong>Left VA:</strong> {encounter.visual_acuity_left || "-"}</p>
-          <p><strong>Right VA:</strong> {encounter.visual_acuity_right || "-"}</p>
+          <p><strong>Legacy Left VA:</strong> {encounter.visual_acuity_left || "-"}</p>
+          <p><strong>Legacy Right VA:</strong> {encounter.visual_acuity_right || "-"}</p>
         </div>
       </section>
 
       <ImageUploadForm
         encounterId={encounter.id}
         patientId={encounter.patient}
+        existingUploads={uploads}
         onUploadSuccess={handleImageUploaded}
       />
 
@@ -222,9 +264,15 @@ export default function EncounterDetailPage({ params }: Props) {
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Uploaded Images</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Retinal images and AI-assisted clinician support.
+            One image is allowed per eye. Delete an image before uploading a replacement.
           </p>
         </div>
+
+        {uploadActionMessage ? (
+          <p className="mb-4 rounded bg-slate-50 p-3 text-sm text-gray-700">
+            {uploadActionMessage}
+          </p>
+        ) : null}
 
         {uploads.length === 0 ? (
           <p>No images uploaded yet.</p>
@@ -235,11 +283,24 @@ export default function EncounterDetailPage({ params }: Props) {
 
               return (
                 <div key={upload.id} className="space-y-4 rounded-lg border p-4">
-                  <div className="space-y-1 text-sm">
-                    <p><strong>ID:</strong> {upload.image_upload_id}</p>
-                    <p><strong>Laterality:</strong> {upload.eye_laterality}</p>
-                    <p><strong>Type:</strong> {upload.image_type}</p>
-                    <p><strong>Quality:</strong> {upload.image_quality}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1 text-sm">
+                      <p><strong>ID:</strong> {upload.image_upload_id}</p>
+                      <p><strong>Laterality:</strong> {upload.eye_laterality}</p>
+                      <p><strong>Type:</strong> {upload.image_type}</p>
+                      <p><strong>Quality:</strong> {upload.image_quality}</p>
+                    </div>
+
+                    {canDeleteUploads ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUpload(upload.id)}
+                        disabled={deletingUploadId === upload.id}
+                        className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletingUploadId === upload.id ? "Deleting..." : "Delete"}
+                      </button>
+                    ) : null}
                   </div>
 
                   <img
@@ -407,14 +468,38 @@ export default function EncounterDetailPage({ params }: Props) {
           <div className="space-y-4">
             {reports.map((report) => (
               <div key={report.id} className="space-y-3 rounded-lg border p-4">
-                <div className="space-y-2">
-                  <p><strong>Report ID:</strong> {report.report_id}</p>
-                  <p><strong>Review Date:</strong> {report.review_date}</p>
-                  <p><strong>DR Grade:</strong> {report.dr_grade || "-"}</p>
-                  <p><strong>Maculopathy Grade:</strong> {report.maculopathy_grade || "-"}</p>
-                  <p><strong>Urgency:</strong> {report.urgency_outcome}</p>
-                  <p><strong>Status:</strong> {report.report_status}</p>
-                  <p><strong>Recommendation:</strong> {report.recommendation || "-"}</p>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p><strong>Report ID:</strong> {report.report_id}</p>
+                    <p><strong>Review Date:</strong> {report.review_date}</p>
+                    <p><strong>Urgency:</strong> {displayValue(report.urgency_outcome)}</p>
+                    <p><strong>Status:</strong> {displayValue(report.report_status)}</p>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded border bg-slate-50 p-3 text-sm">
+                      <p className="mb-2 font-semibold">Left Eye</p>
+                      <p><strong>Unaided VA:</strong> {report.left_unaided_va || "-"}</p>
+                      <p><strong>Corrected / Pinhole VA:</strong> {report.left_corrected_va || "-"}</p>
+                      <p><strong>DR Grade:</strong> {report.left_dr_grade || "-"}</p>
+                      <p><strong>Maculopathy:</strong> {report.left_maculopathy_grade || "-"}</p>
+                    </div>
+
+                    <div className="rounded border bg-slate-50 p-3 text-sm">
+                      <p className="mb-2 font-semibold">Right Eye</p>
+                      <p><strong>Unaided VA:</strong> {report.right_unaided_va || "-"}</p>
+                      <p><strong>Corrected / Pinhole VA:</strong> {report.right_corrected_va || "-"}</p>
+                      <p><strong>DR Grade:</strong> {report.right_dr_grade || "-"}</p>
+                      <p><strong>Maculopathy:</strong> {report.right_maculopathy_grade || "-"}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p><strong>Legacy DR Grade:</strong> {report.dr_grade || "-"}</p>
+                    <p><strong>Legacy Maculopathy Grade:</strong> {report.maculopathy_grade || "-"}</p>
+                    <p><strong>Recommendation:</strong> {report.recommendation || "-"}</p>
+                    <p><strong>Notes:</strong> {report.notes || "-"}</p>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">

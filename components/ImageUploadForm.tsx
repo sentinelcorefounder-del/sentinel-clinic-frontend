@@ -7,6 +7,10 @@ import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 type Props = {
   encounterId: number;
   patientId: number;
+  existingUploads?: {
+    id: number;
+    eye_laterality: string;
+  }[];
   onUploadSuccess?: () => Promise<void> | void;
 };
 
@@ -15,6 +19,7 @@ const ALLOWED_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
 export default function ImageUploadForm({
   encounterId,
   patientId,
+  existingUploads = [],
   onUploadSuccess,
 }: Props) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -29,6 +34,9 @@ export default function ImageUploadForm({
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  const hasLeftImage = existingUploads.some((u) => u.eye_laterality === "left");
+  const hasRightImage = existingUploads.some((u) => u.eye_laterality === "right");
 
   useEffect(() => {
     async function loadUser() {
@@ -56,6 +64,16 @@ export default function ImageUploadForm({
 
     if (!file) {
       setMessage("Please select an image file.");
+      return;
+    }
+
+    if (eyeLaterality === "left" && hasLeftImage) {
+      setMessage("A left eye image already exists. Delete it before uploading a replacement.");
+      return;
+    }
+
+    if (eyeLaterality === "right" && hasRightImage) {
+      setMessage("A right eye image already exists. Delete it before uploading a replacement.");
       return;
     }
 
@@ -109,16 +127,27 @@ export default function ImageUploadForm({
         <p className="text-sm text-gray-600">
           You do not have permission to upload retinal images.
         </p>
-        <p className="text-xs text-gray-500">
-          Allowed roles: clinic_screener, clinic_admin, super_admin
-        </p>
       </div>
     );
   }
 
+  const selectedEyeAlreadyUploaded =
+    (eyeLaterality === "left" && hasLeftImage) ||
+    (eyeLaterality === "right" && hasRightImage);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-4">
-      <h2 className="text-xl font-semibold">Upload Retinal Image</h2>
+      <div>
+        <h2 className="text-xl font-semibold">Upload Retinal Image</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          One image is allowed per eye for each encounter. Delete an existing image before replacing it.
+        </p>
+      </div>
+
+      <div className="rounded bg-slate-50 p-3 text-sm text-slate-700">
+        <p><strong>Left eye:</strong> {hasLeftImage ? "Uploaded" : "Not uploaded"}</p>
+        <p><strong>Right eye:</strong> {hasRightImage ? "Uploaded" : "Not uploaded"}</p>
+      </div>
 
       <input
         value={imageUploadId}
@@ -133,9 +162,19 @@ export default function ImageUploadForm({
         onChange={(e) => setEyeLaterality(e.target.value)}
         className="w-full rounded border p-3"
       >
-        <option value="left">Left</option>
-        <option value="right">Right</option>
+        <option value="left" disabled={hasLeftImage}>
+          Left {hasLeftImage ? "(already uploaded)" : ""}
+        </option>
+        <option value="right" disabled={hasRightImage}>
+          Right {hasRightImage ? "(already uploaded)" : ""}
+        </option>
       </select>
+
+      {selectedEyeAlreadyUploaded ? (
+        <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          This eye already has an uploaded image. Delete the existing image before uploading a replacement.
+        </p>
+      ) : null}
 
       <select
         value={imageType}
@@ -188,7 +227,7 @@ export default function ImageUploadForm({
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || selectedEyeAlreadyUploaded}
         className="rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50"
       >
         {loading ? "Uploading & analyzing..." : "Upload Image"}

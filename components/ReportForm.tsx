@@ -21,6 +21,42 @@ type CreatedReport = {
 const ALLOWED_REPORT_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 
+const VA_OPTIONS = [
+  "",
+  "6/4",
+  "6/5",
+  "6/6",
+  "6/7.5",
+  "6/9",
+  "6/12",
+  "6/15",
+  "6/18",
+  "6/24",
+  "6/36",
+  "6/60",
+  "CF",
+  "HM",
+  "PL",
+  "NPL",
+];
+
+const DR_GRADE_OPTIONS = [
+  { value: "", label: "Not Recorded" },
+  { value: "R0", label: "R0 - No DR" },
+  { value: "R1", label: "R1 - Background DR" },
+  { value: "R2", label: "R2 - Pre-proliferative DR" },
+  { value: "R3A", label: "R3A - Active proliferative DR" },
+  { value: "R3S", label: "R3S - Stable treated proliferative DR" },
+  { value: "U", label: "Ungradable" },
+];
+
+const MACULOPATHY_OPTIONS = [
+  { value: "", label: "Not Recorded" },
+  { value: "M0", label: "M0 - No maculopathy" },
+  { value: "M1", label: "M1 - Maculopathy" },
+  { value: "U", label: "Ungradable" },
+];
+
 export default function ReportForm({
   encounterId,
   patientId,
@@ -38,8 +74,20 @@ export default function ReportForm({
     encounter: encounterId,
     patient: patientId,
     review_date: "",
+
+    left_unaided_va: "",
+    left_corrected_va: "",
+    left_dr_grade: "",
+    left_maculopathy_grade: "",
+
+    right_unaided_va: "",
+    right_corrected_va: "",
+    right_dr_grade: "",
+    right_maculopathy_grade: "",
+
     dr_grade: "",
     maculopathy_grade: "",
+
     ungradable: false,
     urgency_outcome: "routine_followup",
     recommendation: "",
@@ -84,6 +132,10 @@ export default function ReportForm({
 
       if (fieldName === "ungradable" && value === true) {
         next.urgency_outcome = "image_retake";
+        next.left_dr_grade = "U";
+        next.left_maculopathy_grade = "U";
+        next.right_dr_grade = "U";
+        next.right_maculopathy_grade = "U";
       }
 
       if (fieldName === "urgency_outcome" && value === "image_retake") {
@@ -119,7 +171,23 @@ export default function ReportForm({
     }
 
     try {
-      const created = await createReport(formData);
+      const payload = {
+        ...formData,
+
+        // Legacy whole-report fields for backwards compatibility.
+        dr_grade:
+          formData.right_dr_grade ||
+          formData.left_dr_grade ||
+          formData.dr_grade ||
+          "",
+        maculopathy_grade:
+          formData.right_maculopathy_grade ||
+          formData.left_maculopathy_grade ||
+          formData.maculopathy_grade ||
+          "",
+      };
+
+      const created = await createReport(payload);
 
       setCreatedReport({
         id: created.id,
@@ -133,8 +201,20 @@ export default function ReportForm({
         ...prev,
         report_id: "",
         review_date: "",
+
+        left_unaided_va: "",
+        left_corrected_va: "",
+        left_dr_grade: "",
+        left_maculopathy_grade: "",
+
+        right_unaided_va: "",
+        right_corrected_va: "",
+        right_dr_grade: "",
+        right_maculopathy_grade: "",
+
         dr_grade: "",
         maculopathy_grade: "",
+
         recommendation: "",
         next_followup_interval: "",
         notes: "",
@@ -216,9 +296,6 @@ export default function ReportForm({
         <p className="text-sm text-gray-600">
           You do not have permission to create or update reports.
         </p>
-        <p className="text-xs text-gray-500">
-          Allowed roles: reviewer, clinic_admin, super_admin
-        </p>
       </div>
     );
   }
@@ -274,21 +351,81 @@ export default function ReportForm({
           required
         />
 
-        <input
-          name="dr_grade"
-          value={formData.dr_grade}
-          onChange={handleChange}
-          placeholder="DR Grade"
-          className="w-full rounded border p-3"
-        />
+        <div className="rounded-lg border bg-slate-50 p-4">
+          <h3 className="mb-3 font-semibold">Left Eye</h3>
 
-        <input
-          name="maculopathy_grade"
-          value={formData.maculopathy_grade}
-          onChange={handleChange}
-          placeholder="Maculopathy Grade"
-          className="w-full rounded border p-3"
-        />
+          <div className="grid gap-3 md:grid-cols-2">
+            <SelectField
+              label="Left Unaided VA"
+              name="left_unaided_va"
+              value={formData.left_unaided_va}
+              onChange={handleChange}
+              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
+            />
+
+            <SelectField
+              label="Left Corrected / Pinhole VA"
+              name="left_corrected_va"
+              value={formData.left_corrected_va}
+              onChange={handleChange}
+              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
+            />
+
+            <SelectField
+              label="Left DR Grade"
+              name="left_dr_grade"
+              value={formData.left_dr_grade}
+              onChange={handleChange}
+              options={DR_GRADE_OPTIONS}
+            />
+
+            <SelectField
+              label="Left Maculopathy Grade"
+              name="left_maculopathy_grade"
+              value={formData.left_maculopathy_grade}
+              onChange={handleChange}
+              options={MACULOPATHY_OPTIONS}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-slate-50 p-4">
+          <h3 className="mb-3 font-semibold">Right Eye</h3>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <SelectField
+              label="Right Unaided VA"
+              name="right_unaided_va"
+              value={formData.right_unaided_va}
+              onChange={handleChange}
+              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
+            />
+
+            <SelectField
+              label="Right Corrected / Pinhole VA"
+              name="right_corrected_va"
+              value={formData.right_corrected_va}
+              onChange={handleChange}
+              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
+            />
+
+            <SelectField
+              label="Right DR Grade"
+              name="right_dr_grade"
+              value={formData.right_dr_grade}
+              onChange={handleChange}
+              options={DR_GRADE_OPTIONS}
+            />
+
+            <SelectField
+              label="Right Maculopathy Grade"
+              name="right_maculopathy_grade"
+              value={formData.right_maculopathy_grade}
+              onChange={handleChange}
+              options={MACULOPATHY_OPTIONS}
+            />
+          </div>
+        </div>
 
         <label className="flex items-center gap-2">
           <input
@@ -297,12 +434,8 @@ export default function ReportForm({
             checked={formData.ungradable}
             onChange={handleChange}
           />
-          Ungradable
+          Ungradable / image retake required
         </label>
-
-        <p className="text-xs text-gray-500">
-          If no usable image is available, the report will be marked for image retake.
-        </p>
 
         <select
           name="urgency_outcome"
@@ -402,5 +535,37 @@ export default function ReportForm({
         ) : null}
       </form>
     </div>
+  );
+}
+
+function SelectField({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="space-y-1 text-sm">
+      <span className="font-medium">{label}</span>
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        className="w-full rounded border bg-white p-3"
+      >
+        {options.map((option) => (
+          <option key={`${name}-${option.value}`} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

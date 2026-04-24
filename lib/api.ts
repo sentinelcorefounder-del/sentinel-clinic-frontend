@@ -243,6 +243,21 @@ export async function createImageUpload(formData: FormData) {
   return res.json();
 }
 
+export async function deleteImageUpload(uploadId: string | number) {
+  const res = await fetch(`${API_URL}/uploads/${uploadId}/`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: await getCsrfHeaders(false),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to delete image: ${res.status} ${text}`);
+  }
+
+  return true;
+}
+
 export async function fetchEncounterReports(id: string) {
   const res = await fetch(`${API_URL}/reports/encounter/${id}/`, {
     cache: "no-store",
@@ -271,9 +286,6 @@ export async function createReport(data: any) {
     const detail =
       responseData?.detail ||
       responseData?.non_field_errors?.[0] ||
-      responseData?.encounter?.[0] ||
-      responseData?.patient?.[0] ||
-      responseData?.report_id?.[0] ||
       "Failed to create report";
     throw new Error(detail);
   }
