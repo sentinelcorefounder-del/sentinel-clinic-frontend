@@ -85,9 +85,6 @@ export default function ReportForm({
     right_dr_grade: "",
     right_maculopathy_grade: "",
 
-    dr_grade: "",
-    maculopathy_grade: "",
-
     ungradable: false,
     urgency_outcome: "routine_followup",
     recommendation: "",
@@ -171,23 +168,7 @@ export default function ReportForm({
     }
 
     try {
-      const payload = {
-        ...formData,
-
-        // Legacy whole-report fields for backwards compatibility.
-        dr_grade:
-          formData.right_dr_grade ||
-          formData.left_dr_grade ||
-          formData.dr_grade ||
-          "",
-        maculopathy_grade:
-          formData.right_maculopathy_grade ||
-          formData.left_maculopathy_grade ||
-          formData.maculopathy_grade ||
-          "",
-      };
-
-      const created = await createReport(payload);
+      const created = await createReport(formData);
 
       setCreatedReport({
         id: created.id,
@@ -211,9 +192,6 @@ export default function ReportForm({
         right_corrected_va: "",
         right_dr_grade: "",
         right_maculopathy_grade: "",
-
-        dr_grade: "",
-        maculopathy_grade: "",
 
         recommendation: "",
         next_followup_interval: "",

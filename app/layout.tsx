@@ -29,10 +29,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-100 text-slate-950">
+      <body className="min-h-full bg-slate-50 text-slate-950">
         <AuthGate>
           <CurrentUserBar />
-          <div className="flex-1">{children}</div>
+          <div className="min-h-[calc(100vh-88px)]">{children}</div>
         </AuthGate>
       </body>
     </html>

@@ -26,41 +26,33 @@ export type DatasetLabel = {
   id: number;
   label_id: string;
   image_upload: number;
+  source_report: number | null;
   encounter: number;
   patient: number;
-
-  eye_laterality: string;
   consent_confirmed: boolean;
   image_quality_label: string;
-
+  eye_laterality: string;
   unaided_visual_acuity: string;
   corrected_visual_acuity: string;
-
   dr_grade: string;
   maculopathy_grade: string;
-
   diabetic_referable: boolean;
   vision_referral_needed: boolean;
   vision_referral_reason: string;
-
   referable: boolean;
   referral_urgency: string;
-
   clinician_notes: string;
   other_findings: string;
-
   ai_prediction_at_label_time: string;
   ai_provider_at_label_time: string;
   ai_confidence_at_label_time: number | null;
   ai_referable_at_label_time: boolean | null;
-
   report_status_at_label_time: string;
   quality_score: number | null;
   quality_flag: string | null;
   ai_clinician_agreement: boolean | null;
   disagreement_flag: string | null;
   label_source: string;
-
   labelled_by: number | null;
   labelled_by_username: string | null;
   labelled_at: string;
@@ -71,8 +63,10 @@ export type ImageUpload = {
   id: number;
   image_upload_id: string;
   encounter: number;
+  encounter_display?: string;
   patient: number;
-  eye_laterality: string;
+  patient_display?: string;
+  eye_laterality: "left" | "right" | string;
   image_type: string;
   image_file: string;
   image_quality: string;
@@ -81,4 +75,9 @@ export type ImageUpload = {
   uploaded_at: string;
   ai_analysis?: AIAnalysis | null;
   dataset_label?: DatasetLabel | null;
+};
+
+export type PatientImageComparison = {
+  left: ImageUpload[];
+  right: ImageUpload[];
 };

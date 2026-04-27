@@ -1,13 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f1f5f9;
+  --background: #f8fafc;
   --foreground: #0f172a;
+  --card: #ffffff;
+  --muted: #64748b;
+  --brand: #2563eb;
+  --brand-dark: #1d4ed8;
 }
 
 html,
 body {
-  background: var(--background);
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 32rem),
+    var(--background);
   color: var(--foreground);
 }
 
@@ -37,4 +44,74 @@ textarea {
 ::placeholder {
   color: #64748b;
   opacity: 1;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sentinel-page {
+  width: 100%;
+  max-width: none;
+  padding: 40px 48px;
+}
+
+.sentinel-card {
+  border: 1px solid rgb(203 213 225);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.sentinel-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #ffffff !important;
+  padding: 12px 18px;
+  font-weight: 800;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.18);
+  transition: all 160ms ease;
+}
+
+.sentinel-primary-button:hover {
+  background: #020617;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+.sentinel-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgb(148 163 184);
+  background: white;
+  color: #0f172a;
+  padding: 11px 16px;
+  font-weight: 750;
+  transition: all 160ms ease;
+}
+
+.sentinel-secondary-button:hover {
+  background: #f8fafc;
+  border-color: #64748b;
+}
+
+
+/* Keep major page sections close to the live portal width */
+.sentinel-wide-card {
+  width: 100%;
+  max-width: none;
+}
+
+/* Prevent action buttons becoming low-contrast because of inherited link/button styles */
+.sentinel-primary-button,
+.sentinel-primary-button:visited,
+.sentinel-primary-button:hover,
+.sentinel-primary-button:active {
+  color: #ffffff !important;
 }

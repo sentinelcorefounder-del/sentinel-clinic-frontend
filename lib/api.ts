@@ -464,3 +464,17 @@ export async function submitHospitalReferral(data: {
 
   return responseData;
 }
+
+export async function fetchPatientUploads(id: string | number) {
+  const res = await fetch(`${API_URL}/uploads/patient/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch patient uploads: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
