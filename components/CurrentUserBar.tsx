@@ -10,32 +10,22 @@ import {
 } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
 
-function navClass() {
-  return "rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950";
-}
-
 function BrandBlock({ user }: { user: CurrentUser | null }) {
   const isHospital = isHospitalUser(user);
 
   return (
-    <Link
-      href={isHospital ? "/hospital" : "/dashboard"}
-      className="group flex items-center gap-4"
-    >
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition group-hover:shadow-md">
-        <img
-          src="/sentinel-logo.png"
-          alt="Sentinel logo"
-          className="h-13 w-13 rounded-xl object-contain"
-        />
-      </div>
-
-      <div className="leading-tight">
-        <p className="text-lg font-extrabold tracking-tight text-slate-950">
-          {isHospital ? "Sentinel Hospital" : "Sentinel Clinic"}
+    <Link href={isHospital ? "/hospital" : "/dashboard"} className="flex items-center gap-3">
+      <img
+        src="/sentinel-logo.png"
+        alt="Sentinel logo"
+        className="h-10 w-10 rounded object-contain"
+      />
+      <div>
+        <p className="text-sm font-semibold text-slate-950 leading-tight">
+          {isHospital ? "Sentinel" : "Sentinel"}
         </p>
-        <p className="text-sm font-semibold text-slate-600">
-          {isHospital ? "Referral Tracking Portal" : "Diabetic Eye Portal"}
+        <p className="text-xs text-slate-700 leading-tight">
+          {isHospital ? "Referral Tracking Portal" : "Retinal Assessment Portal"}
         </p>
       </div>
     </Link>
@@ -47,23 +37,23 @@ function Navigation({ user }: { user: CurrentUser }) {
   const clinic = isClinicUser(user);
 
   return (
-    <nav className="hidden items-center gap-1 lg:flex">
-      <Link href="/" className={navClass()}>
+    <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
+      <Link href="/" className="hover:text-slate-950 hover:underline">
         Home
       </Link>
 
       {hospital ? (
         <>
-          <Link href="/hospital" className={navClass()}>
+          <Link href="/hospital" className="hover:text-slate-950 hover:underline">
             Dashboard
           </Link>
-          <Link href="/hospital/referrals/new" className={navClass()}>
+          <Link href="/hospital/referrals/new" className="hover:text-slate-950 hover:underline">
             New Referral
           </Link>
-          <Link href="/hospital/referrals" className={navClass()}>
+          <Link href="/hospital/referrals" className="hover:text-slate-950 hover:underline">
             Referrals
           </Link>
-          <Link href="/hospital/payouts" className={navClass()}>
+          <Link href="/hospital/payouts" className="hover:text-slate-950 hover:underline">
             Payouts
           </Link>
         </>
@@ -71,13 +61,13 @@ function Navigation({ user }: { user: CurrentUser }) {
 
       {clinic ? (
         <>
-          <Link href="/dashboard" className={navClass()}>
+          <Link href="/dashboard" className="hover:text-slate-950 hover:underline">
             Dashboard
           </Link>
-          <Link href="/patients" className={navClass()}>
+          <Link href="/patients" className="hover:text-slate-950 hover:underline">
             Patients
           </Link>
-          <Link href="/encounters" className={navClass()}>
+          <Link href="/encounters" className="hover:text-slate-950 hover:underline">
             Encounters
           </Link>
         </>
@@ -107,18 +97,18 @@ export default function CurrentUserBar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
-      <div className="flex min-h-[96px] w-full items-center justify-between gap-8 px-10 py-5 lg:px-16">
-        <div className="flex min-w-0 items-center gap-10">
+    <header className="w-full border-b border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3">
+        <div className="flex items-center gap-8">
           <BrandBlock user={user} />
           {!loading && user ? <Navigation user={user} /> : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-4">
+        <div className="flex items-center gap-4">
           {!loading && !user ? (
             <Link
               href="/login"
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
             >
               Sign in
             </Link>
@@ -126,14 +116,12 @@ export default function CurrentUserBar() {
 
           {!loading && user ? (
             <>
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-extrabold text-slate-950">
-                  {user.username}
-                </p>
-                <p className="max-w-[180px] truncate text-xs font-medium text-slate-600">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-slate-950">{user.username}</p>
+                <p className="text-xs text-slate-700">
                   {user.organization?.name || "No organization"}
                 </p>
-                <p className="max-w-[180px] truncate text-xs font-semibold text-indigo-700">
+                <p className="text-xs text-slate-600">
                   {user.roles?.length ? user.roles.join(", ") : "No role assigned"}
                 </p>
               </div>
