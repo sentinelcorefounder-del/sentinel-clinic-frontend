@@ -85,6 +85,9 @@ export default function ReportForm({
     right_dr_grade: "",
     right_maculopathy_grade: "",
 
+    dr_grade: "",
+    maculopathy_grade: "",
+
     ungradable: false,
     urgency_outcome: "routine_followup",
     recommendation: "",
@@ -96,6 +99,7 @@ export default function ReportForm({
   const [loading, setLoading] = useState(false);
   const [submittingToOps, setSubmittingToOps] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
 
   useEffect(() => {
     async function loadUser() {
@@ -157,18 +161,36 @@ export default function ReportForm({
     e.preventDefault();
     setLoading(true);
     setMessage("");
+    setMessageType("info");
     setCreatedReport(null);
 
     const allowed = hasAnyRole(currentUser, ALLOWED_REPORT_ROLES);
 
     if (!allowed) {
+      setMessageType("error");
       setMessage("You do not have permission to create reports.");
       setLoading(false);
       return;
     }
 
     try {
-      const created = await createReport(formData);
+      const payload = {
+        ...formData,
+
+        // Legacy whole-report fields for backwards compatibility.
+        dr_grade:
+          formData.right_dr_grade ||
+          formData.left_dr_grade ||
+          formData.dr_grade ||
+          "",
+        maculopathy_grade:
+          formData.right_maculopathy_grade ||
+          formData.left_maculopathy_grade ||
+          formData.maculopathy_grade ||
+          "",
+      };
+
+      const created = await createReport(payload);
 
       setCreatedReport({
         id: created.id,
@@ -176,6 +198,7 @@ export default function ReportForm({
         report_status: created.report_status,
       });
 
+      setMessageType("success");
       setMessage("Report created successfully.");
 
       setFormData((prev) => ({
@@ -193,6 +216,9 @@ export default function ReportForm({
         right_dr_grade: "",
         right_maculopathy_grade: "",
 
+        dr_grade: "",
+        maculopathy_grade: "",
+
         recommendation: "",
         next_followup_interval: "",
         notes: "",
@@ -209,6 +235,7 @@ export default function ReportForm({
     } catch (error) {
       const nextMessage =
         error instanceof Error ? error.message : "Failed to create report.";
+      setMessageType("error");
       setMessage(nextMessage);
     } finally {
       setLoading(false);
@@ -221,6 +248,7 @@ export default function ReportForm({
     const allowed = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
 
     if (!allowed) {
+      setMessageType("error");
       setMessage("You do not have permission to submit reports to Ops.");
       return;
     }
@@ -228,6 +256,7 @@ export default function ReportForm({
     try {
       setSubmittingToOps(true);
       setMessage("");
+      setMessageType("info");
 
       const response = await submitReportToOps(createdReport.id);
 
@@ -240,6 +269,7 @@ export default function ReportForm({
           : prev
       );
 
+      setMessageType("success");
       setMessage("Report submitted to Ops successfully.");
 
       if (onReportCreated) {
@@ -250,6 +280,7 @@ export default function ReportForm({
     } catch (error) {
       const nextMessage =
         error instanceof Error ? error.message : "Failed to submit report to Ops.";
+      setMessageType("error");
       setMessage(nextMessage);
     } finally {
       setSubmittingToOps(false);
@@ -466,7 +497,19 @@ export default function ReportForm({
           rows={4}
         />
 
-        {message ? <p className="text-sm">{message}</p> : null}
+        {message ? (
+          <div
+            className={`rounded-lg border p-3 text-sm font-medium ${
+              messageType === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : messageType === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
+          >
+            {message}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-3">
           <button

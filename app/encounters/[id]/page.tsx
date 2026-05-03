@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   fetchEncounterById,
+  updateEncounter,
   fetchEncounterUploads,
   fetchEncounterReports,
   fetchEncounterConsents,
@@ -32,8 +33,23 @@ const API_BASE_URL =
 const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 const ALLOWED_DELETE_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
 
+function displayValue(value?: string | null) {
+  if (!value) return "-";
+  return value.replaceAll("_", " ");
+}
+
+function displayProvider(provider?: string | null) {
+  if (provider === "openai") return "OpenAI";
+  if (provider === "hybrid") return "Hybrid AI";
+  return "Sentinel AI";
+}
+
+function resolveFileUrl(fileUrl?: string | null) {
+  if (!fileUrl) return "";
+  return fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl}`;
+}
+
 export default function EncounterDetailPage({ params }: Props) {
-  const [id, setId] = useState<string>("");
   const [encounter, setEncounter] = useState<Encounter | null>(null);
   const [patient, setPatient] = useState<any>(null);
   const [uploads, setUploads] = useState<ImageUpload[]>([]);
@@ -47,6 +63,18 @@ export default function EncounterDetailPage({ params }: Props) {
   const [submittingReportId, setSubmittingReportId] = useState<number | null>(null);
   const [deletingUploadId, setDeletingUploadId] = useState<number | null>(null);
 
+  const [measurementForm, setMeasurementForm] = useState({
+    iop_before_dilation_left: "",
+    iop_before_dilation_right: "",
+    iop_after_dilation_left: "",
+    iop_after_dilation_right: "",
+    dilation_drops_used: "",
+    dilation_notes: "",
+  });
+  const [savingMeasurements, setSavingMeasurements] = useState(false);
+  const [measurementMessage, setMeasurementMessage] = useState("");
+  const [measurementMessageType, setMeasurementMessageType] = useState<"success" | "error" | "info">("info");
+
   async function loadEncounterPage(encounterId: string) {
     const encounterData: Encounter = await fetchEncounterById(encounterId);
     const patientData = await fetchPatientById(String(encounterData.patient));
@@ -57,6 +85,14 @@ export default function EncounterDetailPage({ params }: Props) {
     ]);
 
     setEncounter(encounterData);
+    setMeasurementForm({
+      iop_before_dilation_left: encounterData.iop_before_dilation_left || "",
+      iop_before_dilation_right: encounterData.iop_before_dilation_right || "",
+      iop_after_dilation_left: encounterData.iop_after_dilation_left || "",
+      iop_after_dilation_right: encounterData.iop_after_dilation_right || "",
+      dilation_drops_used: encounterData.dilation_drops_used || "",
+      dilation_notes: encounterData.dilation_notes || "",
+    });
     setPatient(patientData);
     setUploads(uploadData);
     setReports(reportData);
@@ -70,7 +106,6 @@ export default function EncounterDetailPage({ params }: Props) {
         setCurrentUser(me);
 
         const resolvedParams = await params;
-        setId(resolvedParams.id);
         await loadEncounterPage(resolvedParams.id);
       } catch (err) {
         console.error(err);
@@ -91,6 +126,10 @@ export default function EncounterDetailPage({ params }: Props) {
 
   async function handleImageUploaded() {
     await refreshUploads();
+    if (encounter?.id) {
+      const refreshedEncounter = await fetchEncounterById(String(encounter.id));
+      setEncounter(refreshedEncounter);
+    }
   }
 
   async function handleDeleteUpload(uploadId: number) {
@@ -110,14 +149,11 @@ export default function EncounterDetailPage({ params }: Props) {
     try {
       setDeletingUploadId(uploadId);
       setUploadActionMessage("");
-
       await deleteImageUpload(uploadId);
       await refreshUploads();
-
       setUploadActionMessage("Image deleted successfully. You can now upload a replacement for that eye.");
     } catch (err) {
-      const nextMessage =
-        err instanceof Error ? err.message : "Failed to delete image.";
+      const nextMessage = err instanceof Error ? err.message : "Failed to delete image.";
       setUploadActionMessage(nextMessage);
     } finally {
       setDeletingUploadId(null);
@@ -128,67 +164,73 @@ export default function EncounterDetailPage({ params }: Props) {
     if (!patient?.id || !encounter?.id) return;
 
     try {
-      await updatePatient(String(patient.id), {
-        consent_status: "completed",
-      });
-
+      await updatePatient(String(patient.id), { consent_status: "completed" });
       const refreshedPatient = await fetchPatientById(String(patient.id));
       const refreshedConsents = await fetchEncounterConsents(String(encounter.id));
-
       setPatient(refreshedPatient);
       setConsents(refreshedConsents);
     } catch (err) {
       console.error("Failed to sync patient consent status:", err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Consent was saved, but patient consent status could not be updated.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Consent saved, but patient consent status could not be updated.");
     }
   }
 
   async function handleReportCreated() {
     if (!encounter?.id) return;
     const refreshedReports = await fetchEncounterReports(String(encounter.id));
+    const refreshedEncounter = await fetchEncounterById(String(encounter.id));
     setReports(refreshedReports);
+    setEncounter(refreshedEncounter);
   }
 
   async function handleSubmitExistingReportToOps(reportId: number) {
     try {
       setSubmittingReportId(reportId);
       setReportActionMessage("");
-
       await submitReportToOps(reportId);
       await handleReportCreated();
-
       setReportActionMessage("Report submitted to Ops successfully.");
     } catch (err) {
-      const nextMessage =
-        err instanceof Error ? err.message : "Failed to submit report to Ops.";
+      const nextMessage = err instanceof Error ? err.message : "Failed to submit report to Ops.";
       setReportActionMessage(nextMessage);
     } finally {
       setSubmittingReportId(null);
     }
   }
 
+  function handleMeasurementChange(field: keyof typeof measurementForm, value: string) {
+    setMeasurementForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSaveMeasurements() {
+    if (!encounter?.id) return;
+
+    try {
+      setSavingMeasurements(true);
+      setMeasurementMessage("");
+      setMeasurementMessageType("info");
+      const updatedEncounter = await updateEncounter(encounter.id, measurementForm);
+      setEncounter(updatedEncounter);
+      setMeasurementForm({
+        iop_before_dilation_left: updatedEncounter.iop_before_dilation_left || "",
+        iop_before_dilation_right: updatedEncounter.iop_before_dilation_right || "",
+        iop_after_dilation_left: updatedEncounter.iop_after_dilation_left || "",
+        iop_after_dilation_right: updatedEncounter.iop_after_dilation_right || "",
+        dilation_drops_used: updatedEncounter.dilation_drops_used || "",
+        dilation_notes: updatedEncounter.dilation_notes || "",
+      });
+      setMeasurementMessageType("success");
+      setMeasurementMessage("IOP and dilation details saved successfully.");
+    } catch (err) {
+      setMeasurementMessageType("error");
+      setMeasurementMessage(err instanceof Error ? err.message : "Failed to save IOP and dilation details.");
+    } finally {
+      setSavingMeasurements(false);
+    }
+  }
+
   function canSubmitReport(reportStatus?: string) {
     return ["draft", "under_review", "signed_off"].includes(reportStatus || "");
-  }
-
-  function resolveFileUrl(fileUrl?: string | null) {
-    if (!fileUrl) return "";
-    return fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl}`;
-  }
-
-  function displayProvider(provider?: string | null) {
-    if (provider === "openai") return "OpenAI";
-    if (provider === "hybrid") return "Hybrid AI";
-    return "Sentinel AI";
-  }
-
-  function displayValue(value?: string | null) {
-    if (!value) return "-";
-    return value.replaceAll("_", " ");
   }
 
   const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
@@ -205,9 +247,7 @@ export default function EncounterDetailPage({ params }: Props) {
   if (error || !encounter || !patient) {
     return (
       <main className="p-10">
-        <p className="text-sm text-red-600">
-          {error || "Encounter not found."}
-        </p>
+        <p className="text-sm text-red-600">{error || "Encounter not found."}</p>
       </main>
     );
   }
@@ -218,21 +258,12 @@ export default function EncounterDetailPage({ params }: Props) {
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Encounter Detail</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Clinical workflow for an assigned patient encounter.
-            </p>
+            <p className="mt-1 text-sm text-gray-600">Clinical workflow for an assigned patient encounter.</p>
           </div>
 
           <div className="flex gap-3">
-            <Link
-              href={`/patients/${patient.id}`}
-              className="rounded-lg border px-4 py-2"
-            >
-              View Patient
-            </Link>
-            <Link href="/encounters" className="rounded-lg border px-4 py-2">
-              Back to Encounters
-            </Link>
+            <Link href={`/patients/${patient.id}`} className="rounded-lg border px-4 py-2">View Patient</Link>
+            <Link href="/encounters" className="rounded-lg border px-4 py-2">Back to Encounters</Link>
           </div>
         </div>
 
@@ -245,34 +276,75 @@ export default function EncounterDetailPage({ params }: Props) {
             </Link>
           </p>
           <p><strong>Date:</strong> {encounter.encounter_date}</p>
-          <p><strong>Status:</strong> {encounter.screening_status}</p>
-          <p><strong>Type:</strong> {encounter.encounter_type}</p>
+          <p><strong>Status:</strong> {displayValue(encounter.screening_status)}</p>
+          <p><strong>Type:</strong> {displayValue(encounter.encounter_type)}</p>
           <p><strong>Consent Status:</strong> {patient.consent_status || "-"}</p>
-          <p><strong>Legacy Left VA:</strong> {encounter.visual_acuity_left || "-"}</p>
-          <p><strong>Legacy Right VA:</strong> {encounter.visual_acuity_right || "-"}</p>
         </div>
       </section>
 
-      <ImageUploadForm
-        encounterId={encounter.id}
-        patientId={encounter.patient}
-        existingUploads={uploads}
-        onUploadSuccess={handleImageUploaded}
-      />
+      <section className="rounded-lg border p-6">
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold">IOP and Dilation Details</h2>
+          <p className="mt-1 text-sm text-gray-600">Record intraocular pressure before dilation, drops used, and post-dilation IOP.</p>
+        </div>
+
+        {measurementMessage ? (
+          <div
+            className={`mb-4 rounded-lg border p-3 text-sm font-medium ${
+              measurementMessageType === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : measurementMessageType === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
+          >
+            {measurementMessage}
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-sm font-medium">IOP Before Dilation - Left</span>
+            <input type="text" value={measurementForm.iop_before_dilation_left} onChange={(e) => handleMeasurementChange("iop_before_dilation_left", e.target.value)} placeholder="e.g. 14 mmHg" className="w-full rounded-lg border px-3 py-2" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium">IOP Before Dilation - Right</span>
+            <input type="text" value={measurementForm.iop_before_dilation_right} onChange={(e) => handleMeasurementChange("iop_before_dilation_right", e.target.value)} placeholder="e.g. 15 mmHg" className="w-full rounded-lg border px-3 py-2" />
+          </label>
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-sm font-medium">Dilation Drops Used</span>
+            <input type="text" value={measurementForm.dilation_drops_used} onChange={(e) => handleMeasurementChange("dilation_drops_used", e.target.value)} placeholder="e.g. Tropicamide 1%, Phenylephrine 2.5%" className="w-full rounded-lg border px-3 py-2" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium">IOP After Dilation - Left</span>
+            <input type="text" value={measurementForm.iop_after_dilation_left} onChange={(e) => handleMeasurementChange("iop_after_dilation_left", e.target.value)} placeholder="e.g. 15 mmHg" className="w-full rounded-lg border px-3 py-2" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium">IOP After Dilation - Right</span>
+            <input type="text" value={measurementForm.iop_after_dilation_right} onChange={(e) => handleMeasurementChange("iop_after_dilation_right", e.target.value)} placeholder="e.g. 16 mmHg" className="w-full rounded-lg border px-3 py-2" />
+          </label>
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-sm font-medium">Dilation Notes</span>
+            <textarea value={measurementForm.dilation_notes} onChange={(e) => handleMeasurementChange("dilation_notes", e.target.value)} rows={3} placeholder="Any reaction, poor dilation, contraindication, or timing note" className="w-full rounded-lg border px-3 py-2" />
+          </label>
+        </div>
+
+        <div className="mt-4">
+          <button type="button" onClick={handleSaveMeasurements} disabled={savingMeasurements} className="rounded-lg bg-slate-950 px-4 py-2 font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+            {savingMeasurements ? "Saving..." : "Save IOP / Dilation Details"}
+          </button>
+        </div>
+      </section>
+
+      <ImageUploadForm encounterId={encounter.id} patientId={encounter.patient} existingUploads={uploads} onUploadSuccess={handleImageUploaded} />
 
       <section className="rounded-lg border p-6">
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Uploaded Images</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            One image is allowed per eye. Delete an image before uploading a replacement.
-          </p>
+          <p className="mt-1 text-sm text-gray-600">One image is allowed per eye. Delete an image before uploading a replacement.</p>
         </div>
 
-        {uploadActionMessage ? (
-          <p className="mb-4 rounded bg-slate-50 p-3 text-sm text-gray-700">
-            {uploadActionMessage}
-          </p>
-        ) : null}
+        {uploadActionMessage ? <p className="mb-4 rounded bg-slate-50 p-3 text-sm text-gray-700">{uploadActionMessage}</p> : null}
 
         {uploads.length === 0 ? (
           <p>No images uploaded yet.</p>
@@ -280,7 +352,6 @@ export default function EncounterDetailPage({ params }: Props) {
           <div className="grid gap-4 md:grid-cols-2">
             {uploads.map((upload: any) => {
               const ai = upload.ai_analysis;
-
               return (
                 <div key={upload.id} className="space-y-4 rounded-lg border p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -290,127 +361,28 @@ export default function EncounterDetailPage({ params }: Props) {
                       <p><strong>Type:</strong> {upload.image_type}</p>
                       <p><strong>Quality:</strong> {upload.image_quality}</p>
                     </div>
-
                     {canDeleteUploads ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteUpload(upload.id)}
-                        disabled={deletingUploadId === upload.id}
-                        className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                      >
+                      <button type="button" onClick={() => handleDeleteUpload(upload.id)} disabled={deletingUploadId === upload.id} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
                         {deletingUploadId === upload.id ? "Deleting..." : "Delete"}
                       </button>
                     ) : null}
                   </div>
 
-                  <img
-                    src={resolveFileUrl(upload.image_file)}
-                    alt={upload.image_upload_id}
-                    className="w-full rounded border"
-                  />
+                  <img src={resolveFileUrl(upload.image_file)} alt={upload.image_upload_id} className="w-full rounded border" />
 
                   <div className="rounded-lg border bg-slate-50 p-4">
                     <h3 className="mb-3 text-lg font-semibold">AI Suggestion</h3>
-
                     {!ai ? (
-                      <p className="text-sm text-gray-600">
-                        No AI analysis available yet. Refresh shortly if the image was just uploaded.
-                      </p>
+                      <p className="text-sm text-gray-600">No AI analysis available yet. Refresh shortly if the image was just uploaded.</p>
                     ) : (
                       <div className="space-y-2 text-sm">
                         <p><strong>Provider:</strong> {displayProvider(ai.provider)}</p>
                         <p><strong>Status:</strong> {ai.ai_status || "-"}</p>
                         <p><strong>Fundus Status:</strong> {ai.fundus_status || "-"}</p>
-
-                        {ai.prediction ? (
-                          <p>
-                            <strong>Prediction / Observation:</strong>{" "}
-                            <span
-                              className={
-                                ai.prediction === "Referable DR"
-                                  ? "font-semibold text-red-700"
-                                  : ai.prediction === "No Referable DR"
-                                    ? "font-semibold text-emerald-700"
-                                    : "font-semibold text-gray-800"
-                              }
-                            >
-                              {ai.prediction}
-                            </span>
-                          </p>
-                        ) : null}
-
-                        {ai.referable !== null && ai.referable !== undefined ? (
-                          <p>
-                            <strong>Referable:</strong>{" "}
-                            {ai.referable ? "Yes" : "No"}
-                          </p>
-                        ) : null}
-
-                        {ai.confidence !== null && ai.confidence !== undefined ? (
-                          <p>
-                            <strong>Confidence:</strong>{" "}
-                            {(Number(ai.confidence) * 100).toFixed(1)}%
-                          </p>
-                        ) : null}
-
-                        {ai.severity_label ? (
-                          <p><strong>Severity Label:</strong> {ai.severity_label}</p>
-                        ) : null}
-
-                        {ai.image_quality ? (
-                          <p><strong>AI Image Quality:</strong> {ai.image_quality}</p>
-                        ) : null}
-
-                        {ai.risk_flag ? (
-                          <p><strong>Risk Flag:</strong> {ai.risk_flag}</p>
-                        ) : null}
-
-                        {ai.suggested_review_priority ? (
-                          <p>
-                            <strong>Suggested Review Priority:</strong>{" "}
-                            {ai.suggested_review_priority}
-                          </p>
-                        ) : null}
-
-                        {ai.message ? (
-                          <p><strong>Message:</strong> {ai.message}</p>
-                        ) : null}
-
-                        {ai.draft_note ? (
-                          <div className="rounded border bg-white p-3">
-                            <p className="mb-1 font-semibold">Draft Note</p>
-                            <p>{ai.draft_note}</p>
-                          </div>
-                        ) : null}
-
-                        {ai.heatmap_url ? (
-                          <div className="mt-3 space-y-2">
-                            <p className="font-semibold">AI Heatmap</p>
-                            <img
-                              src={resolveFileUrl(ai.heatmap_url)}
-                              alt="AI heatmap"
-                              className="w-full rounded border"
-                            />
-                          </div>
-                        ) : null}
-
-                        {ai.processed_image_url ? (
-                          <div className="mt-3">
-                            <a
-                              href={resolveFileUrl(ai.processed_image_url)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-blue-700 underline"
-                            >
-                              View processed image
-                            </a>
-                          </div>
-                        ) : null}
-
-                        <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">
-                          {ai.disclaimer ||
-                            "AI output is for clinician review only and must not be treated as a final diagnosis."}
-                        </p>
+                        <p><strong>Prediction / Observation:</strong> {ai.prediction || "-"}</p>
+                        {ai.referable !== null && ai.referable !== undefined ? <p><strong>Referable:</strong> {ai.referable ? "Yes" : "No"}</p> : null}
+                        {ai.confidence !== null && ai.confidence !== undefined ? <p><strong>Confidence:</strong> {(Number(ai.confidence) * 100).toFixed(1)}%</p> : null}
+                        <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">{ai.disclaimer || "AI output is for clinician review only and must not be treated as a final diagnosis."}</p>
                       </div>
                     )}
                   </div>
@@ -421,18 +393,11 @@ export default function EncounterDetailPage({ params }: Props) {
         )}
       </section>
 
-      <ConsentForm
-        encounterId={encounter.id}
-        patientId={encounter.patient}
-        onConsentSaved={handleConsentSaved}
-      />
+      <ConsentForm encounterId={encounter.id} patientId={encounter.patient} onConsentSaved={handleConsentSaved} />
 
       <section className="rounded-lg border p-6">
         <h2 className="mb-4 text-xl font-semibold">Consent Records</h2>
-
-        {consents.length === 0 ? (
-          <p>No consent records yet.</p>
-        ) : (
+        {consents.length === 0 ? <p>No consent records yet.</p> : (
           <div className="space-y-4">
             {consents.map((consent) => (
               <div key={consent.id} className="space-y-2 rounded-lg border p-4">
@@ -448,23 +413,12 @@ export default function EncounterDetailPage({ params }: Props) {
         )}
       </section>
 
-      <ReportForm
-        encounterId={encounter.id}
-        patientId={encounter.patient}
-        patientConsentStatus={patient.consent_status || "pending"}
-        onReportCreated={handleReportCreated}
-      />
+      <ReportForm encounterId={encounter.id} patientId={encounter.patient} patientConsentStatus={patient.consent_status || "pending"} onReportCreated={handleReportCreated} />
 
       <section className="rounded-lg border p-6">
         <h2 className="mb-4 text-xl font-semibold">Structured Reports</h2>
-
-        {reportActionMessage ? (
-          <p className="mb-4 text-sm text-gray-700">{reportActionMessage}</p>
-        ) : null}
-
-        {reports.length === 0 ? (
-          <p>No reports created yet.</p>
-        ) : (
+        {reportActionMessage ? <p className="mb-4 text-sm text-gray-700">{reportActionMessage}</p> : null}
+        {reports.length === 0 ? <p>No reports created yet.</p> : (
           <div className="space-y-4">
             {reports.map((report) => (
               <div key={report.id} className="space-y-3 rounded-lg border p-4">
@@ -475,7 +429,6 @@ export default function EncounterDetailPage({ params }: Props) {
                     <p><strong>Urgency:</strong> {displayValue(report.urgency_outcome)}</p>
                     <p><strong>Status:</strong> {displayValue(report.report_status)}</p>
                   </div>
-
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded border bg-slate-50 p-3 text-sm">
                       <p className="mb-2 font-semibold">Left Eye</p>
@@ -484,7 +437,6 @@ export default function EncounterDetailPage({ params }: Props) {
                       <p><strong>DR Grade:</strong> {report.left_dr_grade || "-"}</p>
                       <p><strong>Maculopathy:</strong> {report.left_maculopathy_grade || "-"}</p>
                     </div>
-
                     <div className="rounded border bg-slate-50 p-3 text-sm">
                       <p className="mb-2 font-semibold">Right Eye</p>
                       <p><strong>Unaided VA:</strong> {report.right_unaided_va || "-"}</p>
@@ -493,40 +445,16 @@ export default function EncounterDetailPage({ params }: Props) {
                       <p><strong>Maculopathy:</strong> {report.right_maculopathy_grade || "-"}</p>
                     </div>
                   </div>
-
                   <div className="space-y-1">
-                    <p><strong>Legacy DR Grade:</strong> {report.dr_grade || "-"}</p>
-                    <p><strong>Legacy Maculopathy Grade:</strong> {report.maculopathy_grade || "-"}</p>
                     <p><strong>Recommendation:</strong> {report.recommendation || "-"}</p>
                     <p><strong>Notes:</strong> {report.notes || "-"}</p>
                   </div>
                 </div>
-
                 <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.open(
-                        getReportPdfUrl(report.id),
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
-                    }
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                  >
-                    Generate PDF
-                  </button>
-
+                  <button type="button" onClick={() => window.open(getReportPdfUrl(report.id), "_blank", "noopener,noreferrer")} className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">Generate PDF</button>
                   {canSubmitToOps && canSubmitReport(report.report_status) ? (
-                    <button
-                      type="button"
-                      onClick={() => handleSubmitExistingReportToOps(report.id)}
-                      disabled={submittingReportId === report.id}
-                      className="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {submittingReportId === report.id
-                        ? "Submitting..."
-                        : "Submit to Ops"}
+                    <button type="button" onClick={() => handleSubmitExistingReportToOps(report.id)} disabled={submittingReportId === report.id} className="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 disabled:opacity-50">
+                      {submittingReportId === report.id ? "Submitting..." : "Submit to Ops"}
                     </button>
                   ) : null}
                 </div>

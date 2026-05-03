@@ -5,6 +5,53 @@ const API_BASE_URL =
 
 const API_URL = `${API_BASE_URL}/api`;
 
+function formatApiError(responseData: any, fallback: string): string {
+  if (!responseData) return fallback;
+
+  if (typeof responseData === "string") return responseData;
+
+  if (responseData.detail) {
+    return Array.isArray(responseData.detail)
+      ? responseData.detail.join(", ")
+      : String(responseData.detail);
+  }
+
+  if (responseData.non_field_errors?.length) {
+    return responseData.non_field_errors.join(", ");
+  }
+
+  if (typeof responseData === "object") {
+    const fieldMessages = Object.entries(responseData)
+      .map(([field, value]) => {
+        const label = field
+          .replaceAll("_", " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+
+        if (Array.isArray(value)) {
+          return `${label}: ${value.join(", ")}`;
+        }
+
+        if (typeof value === "string") {
+          return `${label}: ${value}`;
+        }
+
+        if (value && typeof value === "object") {
+          return `${label}: ${JSON.stringify(value)}`;
+        }
+
+        return "";
+      })
+      .filter(Boolean);
+
+    if (fieldMessages.length) {
+      return fieldMessages.join(" | ");
+    }
+  }
+
+  return fallback;
+}
+
+
 async function getCsrfHeaders(includeJson = true): Promise<Record<string, string>> {
   const { csrfToken } = await ensureCsrf();
 
@@ -189,6 +236,24 @@ export async function fetchEncounterById(id: string) {
   return res.json();
 }
 
+export async function updateEncounter(id: string | number, data: any) {
+  const res = await fetch(`${API_URL}/encounters/${id}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(formatApiError(responseData, "Failed to update encounter."));
+  }
+
+  return responseData;
+}
+
+
 export async function filterEncounters(params: {
   search?: string;
   status?: string;
@@ -283,11 +348,7 @@ export async function createReport(data: any) {
   const responseData = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const detail =
-      responseData?.detail ||
-      responseData?.non_field_errors?.[0] ||
-      "Failed to create report";
-    throw new Error(detail);
+    throw new Error(formatApiError(responseData, "Failed to create report."));
   }
 
   return responseData;
@@ -304,11 +365,7 @@ export async function submitReportToOps(reportId: string | number) {
   const responseData = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const detail =
-      responseData?.detail ||
-      responseData?.non_field_errors?.[0] ||
-      "Failed to submit report to Ops.";
-    throw new Error(detail);
+    throw new Error(formatApiError(responseData, "Failed to submit report to Ops."));
   }
 
   return responseData;

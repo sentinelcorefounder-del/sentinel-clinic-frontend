@@ -3,7 +3,25 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { login, getMe, isHospitalUser } from "@/lib/auth";
+import { login, getMe } from "@/lib/auth";
+
+function getPortalRedirect(user: any) {
+  const roles = user.roles || [];
+
+  if (user.is_superuser || roles.includes("ops_admin") || roles.includes("sentinel_ops")) {
+    return "/ops/dashboard";
+  }
+
+  if (roles.includes("hospital_admin")) {
+    return "/hospital";
+  }
+
+  if (roles.includes("clinic_admin")) {
+    return "/dashboard";
+  }
+
+  return "/dashboard";
+}
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
@@ -33,6 +51,7 @@ function LoginPageContent() {
       }
 
       const me = await getMe();
+
       if (!me) {
         throw new Error("Login succeeded but no active session was found.");
       }
@@ -42,7 +61,7 @@ function LoginPageContent() {
         return;
       }
 
-      window.location.href = isHospitalUser(me) ? "/hospital" : "/dashboard";
+      window.location.href = getPortalRedirect(me);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -61,18 +80,17 @@ function LoginPageContent() {
             Sentinel Sign In
           </h1>
           <p className="text-sm text-slate-700">
-            Sign in to access hospital or clinic workflows.
+            Sign in to access your Sentinel portal.
           </p>
         </div>
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-800">
-            New hospital or clinic?
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-semibold text-blue-800">
+            New hospital, clinic, or Ops user?
           </p>
-          <p className="mt-1 text-sm leading-6 text-amber-900">
-            Access is only available to organizations that have already been
-            onboarded by Sentinel. If your hospital or clinic is new and needs
-            access, please contact Sentinel for onboarding before trying to sign in.
+          <p className="mt-1 text-sm leading-6 text-blue-900">
+            Use the onboarding email sent by Sentinel to activate your account
+            and set your password before signing in.
           </p>
         </div>
 

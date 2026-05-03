@@ -2,7 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getMe, isClinicUser, isHospitalUser, type CurrentUser } from "@/lib/auth";
+import {
+  getMe,
+  isClinicUser,
+  isHospitalUser,
+  type CurrentUser,
+} from "@/lib/auth";
+
+function isOpsUser(user: CurrentUser | null) {
+  if (!user) return false;
+
+  return (
+    user.is_superuser ||
+    user.roles?.includes("ops_admin") ||
+    user.roles?.includes("sentinel_ops")
+  );
+}
 
 export default function HomePage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -24,8 +39,11 @@ export default function HomePage() {
     loadUser();
   }, []);
 
-  const showClinicCard = !loading && user ? isClinicUser(user) : false;
-  const showHospitalCard = !loading && user ? isHospitalUser(user) : false;
+  const showOpsCard = !loading && user ? isOpsUser(user) : false;
+  const showClinicCard =
+    !loading && user && !showOpsCard ? isClinicUser(user) : false;
+  const showHospitalCard =
+    !loading && user && !showOpsCard ? isHospitalUser(user) : false;
 
   return (
     <main className="min-h-screen bg-slate-100 px-8 py-12">
@@ -35,8 +53,8 @@ export default function HomePage() {
             Sentinel Portal
           </h1>
           <p className="max-w-2xl text-base text-slate-700">
-            Unified access for Sentinel clinic workflows and hospital referral
-            tracking.
+            Unified access for Sentinel operations, clinic workflows, and
+            hospital referral tracking.
           </p>
         </div>
 
@@ -46,14 +64,46 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
+            {showOpsCard ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-2 text-xl font-semibold text-slate-950">
+                  Sentinel Ops
+                </h2>
+                <p className="mb-5 text-sm leading-6 text-slate-700">
+                  Manage referrals, patients, hospitals, clinics, payments,
+                  report approvals, onboarding, and operational workflows.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/ops/dashboard"
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium !text-white hover:bg-slate-800"
+                  >
+                    Ops Dashboard
+                  </Link>
+                  <Link
+                    href="/ops/referrals"
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Referrals
+                  </Link>
+                  <Link
+                    href="/ops/patients"
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Patients
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+
             {showClinicCard ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="mb-2 text-xl font-semibold text-slate-950">
                   Clinic workflow
                 </h2>
                 <p className="mb-5 text-sm leading-6 text-slate-700">
-                  Manage assigned patients, screening encounters, uploads, consent,
-                  and structured reports.
+                  Manage assigned patients, screening encounters, uploads,
+                  consent, and structured reports.
                 </p>
                 <div className="flex gap-3">
                   <Link
@@ -78,8 +128,8 @@ export default function HomePage() {
                   Hospital tracking
                 </h2>
                 <p className="mb-5 text-sm leading-6 text-slate-700">
-                  Track referrals, matched clinics, appointment progress, no-shows,
-                  report readiness, and payout status.
+                  Track referrals, matched clinics, appointment progress,
+                  no-shows, report readiness, and payout status.
                 </p>
                 <div className="flex gap-3">
                   <Link
@@ -98,9 +148,10 @@ export default function HomePage() {
               </div>
             ) : null}
 
-            {!showClinicCard && !showHospitalCard ? (
+            {!showOpsCard && !showClinicCard && !showHospitalCard ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm text-slate-700">
-                No portal role is assigned to this account yet.
+                No portal role is assigned to this account yet. Please contact
+                Sentinel Ops.
               </div>
             ) : null}
           </div>
