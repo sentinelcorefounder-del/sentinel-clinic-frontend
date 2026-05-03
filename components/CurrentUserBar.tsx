@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   getMe,
   isHospitalUser,
@@ -21,17 +22,22 @@ function canAccessOps(user: CurrentUser | null) {
   );
 }
 
-function BrandBlock({ user }: { user: CurrentUser | null }) {
-  const isOps = canAccessOps(user);
-  const isHospital = isHospitalUser(user);
+function BrandBlock({
+  user,
+  mode,
+}: {
+  user: CurrentUser | null;
+  mode: "ops" | "clinic" | "hospital";
+}) {
+  const href =
+    mode === "ops" ? "/ops/dashboard" : mode === "hospital" ? "/hospital" : "/dashboard";
 
-  const href = isOps ? "/ops/dashboard" : isHospital ? "/hospital" : "/dashboard";
-
-  const subtitle = isOps
-    ? "Operations Portal"
-    : isHospital
-      ? "Referral Tracking Portal"
-      : "Retinal Assessment Portal";
+  const subtitle =
+    mode === "ops"
+      ? "Operations Portal"
+      : mode === "hospital"
+        ? "Referral Tracking Portal"
+        : "Sentinel Clinic Portal";
 
   return (
     <Link href={href} className="flex items-center gap-3">
@@ -50,12 +56,16 @@ function BrandBlock({ user }: { user: CurrentUser | null }) {
   );
 }
 
-function Navigation({ user }: { user: CurrentUser }) {
-  const isOps = canAccessOps(user);
-  const hospital = isHospitalUser(user);
-  const clinic = isClinicUser(user);
+function Navigation({
+  user,
+  mode,
+}: {
+  user: CurrentUser;
+  mode: "ops" | "clinic" | "hospital";
+}) {
+  const isOpsUser = canAccessOps(user);
 
-  if (isOps) {
+  if (mode === "ops") {
     return (
       <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
         <Link href="/ops/dashboard" className="hover:text-slate-950 hover:underline">
@@ -85,6 +95,7 @@ function Navigation({ user }: { user: CurrentUser }) {
         <Link href="/ops/admin" className="hover:text-slate-950 hover:underline">
           Admin
         </Link>
+
         <Link href="/dashboard" className="text-blue-700 hover:underline">
           Sentinel Clinic
         </Link>
@@ -92,7 +103,7 @@ function Navigation({ user }: { user: CurrentUser }) {
     );
   }
 
-  if (hospital) {
+  if (mode === "hospital") {
     return (
       <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
         <Link href="/hospital" className="hover:text-slate-950 hover:underline">
@@ -111,26 +122,33 @@ function Navigation({ user }: { user: CurrentUser }) {
     );
   }
 
-  if (clinic) {
-    return (
-      <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
-        <Link href="/dashboard" className="hover:text-slate-950 hover:underline">
-          Dashboard
-        </Link>
-        <Link href="/patients" className="hover:text-slate-950 hover:underline">
-          Patients
-        </Link>
-        <Link href="/encounters" className="hover:text-slate-950 hover:underline">
-          Encounters
-        </Link>
-      </nav>
-    );
-  }
+  return (
+    <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
+      <Link href="/dashboard" className="hover:text-slate-950 hover:underline">
+        Clinic Dashboard
+      </Link>
+      <Link href="/patients" className="hover:text-slate-950 hover:underline">
+        Clinic Patients
+      </Link>
+      <Link href="/encounters" className="hover:text-slate-950 hover:underline">
+        Encounters
+      </Link>
 
-  return null;
+      {isOpsUser ? (
+        <Link
+          href="/ops/dashboard"
+          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+        >
+          Back to Ops
+        </Link>
+      ) : null}
+    </nav>
+  );
 }
 
 export default function CurrentUserBar() {
+  const pathname = usePathname();
+
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -150,18 +168,28 @@ export default function CurrentUserBar() {
     loadUser();
   }, []);
 
-  const isOps = canAccessOps(user);
+  const isOpsUser = canAccessOps(user);
+
+  let mode: "ops" | "clinic" | "hospital" = "clinic";
+
+  if (pathname.startsWith("/ops")) {
+    mode = "ops";
+  } else if (pathname.startsWith("/hospital")) {
+    mode = "hospital";
+  } else {
+    mode = "clinic";
+  }
 
   return (
     <header className="w-full border-b border-slate-200 bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3">
         <div className="flex items-center gap-8">
-          <BrandBlock user={user} />
-          {!loading && user ? <Navigation user={user} /> : null}
+          <BrandBlock user={user} mode={mode} />
+          {!loading && user ? <Navigation user={user} mode={mode} /> : null}
         </div>
 
         <div className="flex items-center gap-4">
-          {!loading && isOps ? <OpsNotificationBell /> : null}
+          {!loading && isOpsUser && mode === "ops" ? <OpsNotificationBell /> : null}
 
           {!loading && !user ? (
             <Link
@@ -177,7 +205,9 @@ export default function CurrentUserBar() {
               <div className="text-right">
                 <p className="text-sm font-semibold text-slate-950">{user.username}</p>
                 <p className="text-xs text-slate-700">
-                  {user.organization?.name || "No organization"}
+                  {mode === "ops"
+                    ? "Sentinel Ops"
+                    : user.organization?.name || "Sentinel Clinic"}
                 </p>
                 <p className="text-xs text-slate-600">
                   {user.roles?.length ? user.roles.join(", ") : "No role assigned"}
