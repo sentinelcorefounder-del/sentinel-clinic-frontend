@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   getMe,
   isHospitalUser,
-  isClinicUser,
   type CurrentUser,
 } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
@@ -22,13 +21,13 @@ function canAccessOps(user: CurrentUser | null) {
   );
 }
 
-function BrandBlock({
-  user,
-  mode,
-}: {
-  user: CurrentUser | null;
-  mode: "ops" | "clinic" | "hospital";
-}) {
+function getMode(pathname: string): "ops" | "hospital" | "clinic" {
+  if (pathname.startsWith("/ops")) return "ops";
+  if (pathname.startsWith("/hospital")) return "hospital";
+  return "clinic";
+}
+
+function BrandBlock({ mode }: { mode: "ops" | "hospital" | "clinic" }) {
   const href =
     mode === "ops" ? "/ops/dashboard" : mode === "hospital" ? "/hospital" : "/dashboard";
 
@@ -37,7 +36,7 @@ function BrandBlock({
       ? "Operations Portal"
       : mode === "hospital"
         ? "Referral Tracking Portal"
-        : "Sentinel Clinic Portal";
+        : "Clinic Portal";
 
   return (
     <Link href={href} className="flex items-center gap-3">
@@ -56,71 +55,45 @@ function BrandBlock({
   );
 }
 
-function Navigation({
-  user,
-  mode,
-}: {
-  user: CurrentUser;
-  mode: "ops" | "clinic" | "hospital";
-}) {
-  const isOpsUser = canAccessOps(user);
+function OpsNav() {
+  return (
+    <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
+      <Link href="/ops/dashboard" className="hover:text-slate-950 hover:underline">
+        Ops Dashboard
+      </Link>
+      <Link href="/ops/referrals" className="hover:text-slate-950 hover:underline">
+        Referrals
+      </Link>
+      <Link href="/ops/patients" className="hover:text-slate-950 hover:underline">
+        Patients
+      </Link>
+      <Link href="/ops/hospitals" className="hover:text-slate-950 hover:underline">
+        Hospitals
+      </Link>
+      <Link href="/ops/clinics" className="hover:text-slate-950 hover:underline">
+        Clinics
+      </Link>
+      <Link href="/ops/payments" className="hover:text-slate-950 hover:underline">
+        Payments
+      </Link>
+      <Link href="/ops/notifications" className="hover:text-slate-950 hover:underline">
+        Notifications
+      </Link>
+      <Link href="/ops/audit" className="hover:text-slate-950 hover:underline">
+        Audit Logs
+      </Link>
+      <Link href="/ops/admin" className="hover:text-slate-950 hover:underline">
+        Admin
+      </Link>
+      <Link href="/dashboard" className="text-blue-700 hover:underline">
+        Sentinel Clinic
+      </Link>
+    </nav>
+  );
+}
 
-  if (mode === "ops") {
-    return (
-      <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
-        <Link href="/ops/dashboard" className="hover:text-slate-950 hover:underline">
-          Ops Dashboard
-        </Link>
-        <Link href="/ops/referrals" className="hover:text-slate-950 hover:underline">
-          Referrals
-        </Link>
-        <Link href="/ops/patients" className="hover:text-slate-950 hover:underline">
-          Patients
-        </Link>
-        <Link href="/ops/hospitals" className="hover:text-slate-950 hover:underline">
-          Hospitals
-        </Link>
-        <Link href="/ops/clinics" className="hover:text-slate-950 hover:underline">
-          Clinics
-        </Link>
-        <Link href="/ops/payments" className="hover:text-slate-950 hover:underline">
-          Payments
-        </Link>
-        <Link href="/ops/notifications" className="hover:text-slate-950 hover:underline">
-          Notifications
-        </Link>
-        <Link href="/ops/audit" className="hover:text-slate-950 hover:underline">
-          Audit Logs
-        </Link>
-        <Link href="/ops/admin" className="hover:text-slate-950 hover:underline">
-          Admin
-        </Link>
-
-        <Link href="/dashboard" className="text-blue-700 hover:underline">
-          Sentinel Clinic
-        </Link>
-      </nav>
-    );
-  }
-
-  if (mode === "hospital") {
-    return (
-      <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
-        <Link href="/hospital" className="hover:text-slate-950 hover:underline">
-          Dashboard
-        </Link>
-        <Link href="/hospital/referrals/new" className="hover:text-slate-950 hover:underline">
-          New Referral
-        </Link>
-        <Link href="/hospital/referrals" className="hover:text-slate-950 hover:underline">
-          Referrals
-        </Link>
-        <Link href="/hospital/payouts" className="hover:text-slate-950 hover:underline">
-          Payouts
-        </Link>
-      </nav>
-    );
-  }
+function ClinicNav({ user }: { user: CurrentUser }) {
+  const isOps = canAccessOps(user);
 
   return (
     <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
@@ -134,7 +107,7 @@ function Navigation({
         Encounters
       </Link>
 
-      {isOpsUser ? (
+      {isOps ? (
         <Link
           href="/ops/dashboard"
           className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -146,8 +119,40 @@ function Navigation({
   );
 }
 
+function HospitalNav() {
+  return (
+    <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-800">
+      <Link href="/hospital" className="hover:text-slate-950 hover:underline">
+        Hospital Dashboard
+      </Link>
+      <Link href="/hospital/referrals/new" className="hover:text-slate-950 hover:underline">
+        New Referral
+      </Link>
+      <Link href="/hospital/referrals" className="hover:text-slate-950 hover:underline">
+        Referrals
+      </Link>
+      <Link href="/hospital/payouts" className="hover:text-slate-950 hover:underline">
+        Payouts
+      </Link>
+    </nav>
+  );
+}
+
+function Navigation({
+  user,
+  mode,
+}: {
+  user: CurrentUser;
+  mode: "ops" | "hospital" | "clinic";
+}) {
+  if (mode === "ops") return <OpsNav />;
+  if (mode === "hospital") return <HospitalNav />;
+  return <ClinicNav user={user} />;
+}
+
 export default function CurrentUserBar() {
   const pathname = usePathname();
+  const mode = getMode(pathname);
 
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,28 +173,19 @@ export default function CurrentUserBar() {
     loadUser();
   }, []);
 
-  const isOpsUser = canAccessOps(user);
-
-  let mode: "ops" | "clinic" | "hospital" = "clinic";
-
-  if (pathname.startsWith("/ops")) {
-    mode = "ops";
-  } else if (pathname.startsWith("/hospital")) {
-    mode = "hospital";
-  } else {
-    mode = "clinic";
-  }
+  const isOps = canAccessOps(user);
+  const isHospital = isHospitalUser(user);
 
   return (
     <header className="w-full border-b border-slate-200 bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3">
         <div className="flex items-center gap-8">
-          <BrandBlock user={user} mode={mode} />
+          <BrandBlock mode={mode} />
           {!loading && user ? <Navigation user={user} mode={mode} /> : null}
         </div>
 
         <div className="flex items-center gap-4">
-          {!loading && isOpsUser && mode === "ops" ? <OpsNotificationBell /> : null}
+          {!loading && isOps && mode === "ops" ? <OpsNotificationBell /> : null}
 
           {!loading && !user ? (
             <Link
@@ -203,11 +199,15 @@ export default function CurrentUserBar() {
           {!loading && user ? (
             <>
               <div className="text-right">
-                <p className="text-sm font-semibold text-slate-950">{user.username}</p>
+                <p className="text-sm font-semibold text-slate-950">
+                  {user.username}
+                </p>
                 <p className="text-xs text-slate-700">
                   {mode === "ops"
                     ? "Sentinel Ops"
-                    : user.organization?.name || "Sentinel Clinic"}
+                    : mode === "hospital"
+                      ? user.organization?.name || "Hospital Portal"
+                      : user.organization?.name || "Clinic Portal"}
                 </p>
                 <p className="text-xs text-slate-600">
                   {user.roles?.length ? user.roles.join(", ") : "No role assigned"}
