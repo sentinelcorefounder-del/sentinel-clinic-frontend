@@ -8,6 +8,7 @@ export default async function OpsDashboardPage() {
       <h1 className="text-3xl font-bold mb-6">Ops Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card title="Patients" value={data.network.patients} />
         <Card title="Total Referrals" value={data.referrals.total} />
         <Card title="Matched Referrals" value={data.referrals.clinic_matched} />
         <Card title="Paid Payments" value={data.payments.paid} />
