@@ -1,46 +1,81 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { serverFetch } from "@/lib/server-api";
 
-export default function OpsLayout({
+function canAccessOps(user: any) {
+  const roles = user?.roles || [];
+
+  return (
+    user?.is_superuser ||
+    roles.includes("ops_admin") ||
+    roles.includes("sentinel_ops")
+  );
+}
+
+export default async function OpsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="flex">
-        <aside className="w-64 min-h-screen bg-slate-900 text-white p-6">
-          <h1 className="text-xl font-bold mb-8">Sentinel Ops</h1>
+  let user = null;
 
-          <nav className="space-y-3">
+  try {
+    user = await serverFetch("/api/auth/me/");
+  } catch {
+    redirect("/login");
+  }
+
+  if (!canAccessOps(user)) {
+    redirect("/");
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-100">
+      <div className="flex">
+        <aside className="min-h-screen w-64 bg-slate-950 text-white p-6">
+          <h2 className="text-xl font-bold mb-8">Sentinel Ops</h2>
+
+          <nav className="space-y-3 text-sm">
             <Link href="/ops/dashboard" className="block hover:text-blue-300">
               Dashboard
             </Link>
+
             <Link href="/ops/referrals" className="block hover:text-blue-300">
               Referrals
             </Link>
+
+            <Link href="/ops/patients" className="block hover:text-blue-300">
+              Patients
+            </Link>
+
+            <Link href="/ops/hospitals" className="block hover:text-blue-300">
+              Hospitals
+            </Link>
+
+            <Link href="/ops/clinics" className="block hover:text-blue-300">
+              Clinics
+            </Link>
+
             <Link href="/ops/payments" className="block hover:text-blue-300">
               Payments
             </Link>
-            <Link href="/ops/approvals" className="block hover:text-blue-300">
-              Report Approvals
+
+            <Link href="/ops/notifications" className="block hover:text-blue-300">
+              Notifications
             </Link>
-            <Link href="/ops/admin" className="block hover:text-blue-300">
-            Admin
-            </Link>
-            <Link href="/ops/patients" className="block hover:text-blue-300">
-            Patients
-            </Link>
-            <Link href="/ops/hospitals" className="block hover:text-blue-300">
-            Hospitals
-            </Link>
-            <Link href="/ops/clinics" className="block hover:text-blue-300">
-            Clinics
-            </Link>
-            <Link href="/dashboard" className="block hover:text-blue-300">
-            Sentinel Clinic
-            </Link>
+
             <Link href="/ops/audit" className="block hover:text-blue-300">
-            Audit Logs
+              Audit Logs
+            </Link>
+
+            <Link href="/ops/admin" className="block hover:text-blue-300">
+              Admin
+            </Link>
+
+            <div className="border-t border-slate-700 my-5" />
+
+            <Link href="/dashboard" className="block text-blue-300 hover:text-blue-200">
+              Sentinel Clinic
             </Link>
           </nav>
         </aside>
