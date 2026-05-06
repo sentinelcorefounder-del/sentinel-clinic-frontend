@@ -653,6 +653,13 @@ export default function EncounterDetailPage({ params }: Props) {
                           </p>
                         ) : null}
 
+                        {ai.draft_note ? (
+                          <div className="rounded border bg-slate-50 p-3 text-sm">
+                            <p className="mb-1 font-semibold">Clinical Observation</p>
+                            <p>{ai.draft_note}</p>
+                          </div>
+                        ) : null}
+                        
                         <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">
                           {ai.disclaimer ||
                             "AI output is for clinician review only and must not be treated as a final diagnosis."}
