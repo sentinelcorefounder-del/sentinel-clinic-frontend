@@ -719,6 +719,7 @@ export default function EncounterDetailPage({ params }: Props) {
           encounterId={encounter.id}
           patientId={encounter.patient}
           patientConsentStatus={patient.consent_status || "pending"}
+          encounter={encounterAny}
           onReportCreated={handleReportCreated}
         />
       </section>

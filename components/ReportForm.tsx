@@ -9,6 +9,14 @@ type Props = {
   encounterId: number;
   patientId: number;
   patientConsentStatus: string;
+  encounter?: {
+    left_unaided_va?: string;
+    right_unaided_va?: string;
+    left_corrected_pinhole_va?: string;
+    right_corrected_pinhole_va?: string;
+    poor_va_flag?: boolean;
+    poor_va_reason?: string;
+  } | null;
   onReportCreated?: () => Promise<void> | void;
 };
 
@@ -61,6 +69,7 @@ export default function ReportForm({
   encounterId,
   patientId,
   patientConsentStatus,
+  encounter,
   onReportCreated,
 }: Props) {
   const router = useRouter();
@@ -115,6 +124,57 @@ export default function ReportForm({
 
     loadUser();
   }, []);
+
+  useEffect(() => {
+    if (!encounter) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      left_unaided_va: prev.left_unaided_va || encounter.left_unaided_va || "",
+      right_unaided_va: prev.right_unaided_va || encounter.right_unaided_va || "",
+      left_corrected_va:
+        prev.left_corrected_va || encounter.left_corrected_pinhole_va || "",
+      right_corrected_va:
+        prev.right_corrected_va || encounter.right_corrected_pinhole_va || "",
+    }));
+  }, [encounter]);
+
+  function normaliseVa(value: string) {
+    return (value || "").trim().toLowerCase().replaceAll(" ", "");
+  }
+
+  function isPoorCorrectedPinholeVa(value: string) {
+    return new Set([
+      "6/12",
+      "6/15",
+      "6/18",
+      "6/24",
+      "6/36",
+      "6/60",
+      "cf",
+      "countingfingers",
+      "hm",
+      "handmovements",
+      "pl",
+      "npl",
+      "nlp",
+    ]).has(normaliseVa(value));
+  }
+
+  const poorVaFlag =
+    isPoorCorrectedPinholeVa(formData.left_corrected_va) ||
+    isPoorCorrectedPinholeVa(formData.right_corrected_va);
+
+  const poorVaReason = [
+    isPoorCorrectedPinholeVa(formData.left_corrected_va)
+      ? `Left corrected/pinhole VA is ${formData.left_corrected_va}`
+      : "",
+    isPoorCorrectedPinholeVa(formData.right_corrected_va)
+      ? `Right corrected/pinhole VA is ${formData.right_corrected_va}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -206,13 +266,13 @@ export default function ReportForm({
         report_id: "",
         review_date: "",
 
-        left_unaided_va: "",
-        left_corrected_va: "",
+        left_unaided_va: encounter?.left_unaided_va || "",
+        left_corrected_va: encounter?.left_corrected_pinhole_va || "",
         left_dr_grade: "",
         left_maculopathy_grade: "",
 
-        right_unaided_va: "",
-        right_corrected_va: "",
+        right_unaided_va: encounter?.right_unaided_va || "",
+        right_corrected_va: encounter?.right_corrected_pinhole_va || "",
         right_dr_grade: "",
         right_maculopathy_grade: "",
 
@@ -340,7 +400,24 @@ export default function ReportForm({
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <h2 className="text-xl font-semibold">Create Structured Report</h2>
+        <div>
+          <h2 className="text-xl font-semibold">Create Structured Report</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            VA values are copied from the technician encounter capture by default.
+            The optometrist can leave them as-is or override them if clinically needed.
+          </p>
+        </div>
+
+        {poorVaFlag ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">Poor corrected/pinhole VA flag</p>
+            <p className="mt-1">
+              {poorVaReason ||
+                encounter?.poor_va_reason ||
+                "Corrected/pinhole VA is 6/12 or worse. Consider whether referral is required based on clinical judgement."}
+            </p>
+          </div>
+        ) : null}
 
         <input
           name="report_id"
@@ -569,7 +646,9 @@ function SelectField({
   label: string;
   name: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => void;
   options: { value: string; label: string }[];
 }) {
   return (
