@@ -19,6 +19,11 @@ type HospitalReferral = {
   report_pdf_url?: string;
   hospital_commission_amount: string;
   payout_status: string;
+  payment_status?: string;
+  payment_amount?: string;
+  payment_currency?: string;
+  payment_reference?: string;
+  payment_paid_at?: string;
 };
 
 function statusBadge(status: string) {
@@ -50,6 +55,44 @@ function displayStatus(status: string) {
   if (status === "completed") return "Completed";
   if (status === "cancelled") return "Cancelled";
   return "Submitted";
+}
+
+function paymentBadge(status?: string) {
+  const normalized = (status || "not_created").toLowerCase();
+
+  if (normalized === "paid" || normalized === "success" || normalized === "successful") {
+    return "bg-emerald-100 text-emerald-800 border-emerald-200";
+  }
+
+  if (normalized === "pending" || normalized === "processing") {
+    return "bg-amber-100 text-amber-800 border-amber-200";
+  }
+
+  if (normalized === "failed" || normalized === "exception") {
+    return "bg-red-100 text-red-800 border-red-200";
+  }
+
+  if (normalized === "draft") {
+    return "bg-slate-100 text-slate-800 border-slate-200";
+  }
+
+  return "bg-slate-50 text-slate-600 border-slate-200";
+}
+
+function displayPaymentStatus(status?: string) {
+  const normalized = (status || "not_created").toLowerCase();
+
+  if (normalized === "paid" || normalized === "success" || normalized === "successful") return "Paid";
+  if (normalized === "pending" || normalized === "processing") return "Pending";
+  if (normalized === "failed") return "Failed";
+  if (normalized === "exception") return "Exception";
+  if (normalized === "draft") return "Draft";
+  return "Not Created";
+}
+
+function displayPaymentAmount(referral: HospitalReferral) {
+  if (!referral.payment_amount) return "";
+  return `${referral.payment_currency || "NGN"} ${referral.payment_amount}`;
 }
 
 function reportUrl(referral: HospitalReferral) {
@@ -101,7 +144,7 @@ export default function HospitalReferralsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-950">Referrals</h1>
           <p className="mt-1 text-sm text-slate-700">
-            Track clinic assignment, assessment progress, report status, and payout status.
+            Track clinic assignment, assessment progress, report status, patient payment status, and payout status.
           </p>
         </div>
 
@@ -130,6 +173,7 @@ export default function HospitalReferralsPage() {
               <th className="p-4 text-sm font-semibold text-slate-900">Matched Clinic</th>
               <th className="p-4 text-sm font-semibold text-slate-900">Status</th>
               <th className="p-4 text-sm font-semibold text-slate-900">Report</th>
+              <th className="p-4 text-sm font-semibold text-slate-900">Payment Status</th>
               <th className="p-4 text-sm font-semibold text-slate-900">Payout</th>
             </tr>
           </thead>
@@ -137,7 +181,7 @@ export default function HospitalReferralsPage() {
           <tbody>
             {referrals.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-6 text-sm text-slate-700">
+                <td colSpan={7} className="p-6 text-sm text-slate-700">
                   No referrals found.
                 </td>
               </tr>
@@ -205,6 +249,22 @@ export default function HospitalReferralsPage() {
                       {referral.report_id_display ? (
                         <div className="mt-1 text-xs text-slate-500">
                           {referral.report_id_display}
+                        </div>
+                      ) : null}
+                    </td>
+
+                    <td className="p-4 text-sm text-slate-900">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${paymentBadge(
+                          referral.payment_status
+                        )}`}
+                      >
+                        {displayPaymentStatus(referral.payment_status)}
+                      </span>
+
+                      {referral.payment_amount ? (
+                        <div className="mt-1 text-xs text-slate-600">
+                          {displayPaymentAmount(referral)}
                         </div>
                       ) : null}
                     </td>
