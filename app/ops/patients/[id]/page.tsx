@@ -84,13 +84,14 @@ export default async function OpsPatientDetailPage({
 
       <Section title="Reports">
         <Table
-          headers={["Report ID", "Encounter", "Status", "Outcome", "Review Date"]}
+          headers={["Report ID", "Encounter", "Status", "Outcome", "Review Date", "PDF"]}
           rows={reports.map((r: any) => [
             r.report_id,
             r.encounter_id_display || "-",
             r.report_status,
             r.urgency_outcome,
             r.review_date,
+            r.report_pdf_url ? (<a key={r.id} href={r.report_pdf_url} target="_blank" className="text-blue-600 underline">View PDF</a>) : "-",
           ])}
         />
       </Section>

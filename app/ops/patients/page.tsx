@@ -1,45 +1,14 @@
 import Link from "next/link";
 import { serverFetch } from "@/lib/server-api";
 
-export default async function OpsPatientsPage() {
-  const patients = await serverFetch("/api/ops/patients/");
+type Props = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+function valueOf(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] || "" : value || ""; }
+function buildQuery(params: Record<string, string>) { const q = new URLSearchParams(); Object.entries(params).forEach(([k,v]) => { if (v) q.set(k,v); }); const s=q.toString(); return s ? `?${s}` : ""; }
+function badgeClass(status: string) { const s=(status||"").toLowerCase(); if (["paid","issued","completed"].includes(s)) return "bg-emerald-100 text-emerald-800"; if (["pending","submitted","submitted_to_ops","clinic_matched","under_review"].includes(s)) return "bg-amber-100 text-amber-800"; if (["failed","exception","ops_rejected","cancelled"].includes(s)) return "bg-red-100 text-red-800"; return "bg-slate-100 text-slate-700"; }
+function Badge({ value }: { value: string }) { return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${badgeClass(value)}`}>{(value || "-").replaceAll("_", " ")}</span>; }
 
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Patients</h1>
-
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100 text-left">
-            <tr>
-              <th className="p-3">Patient ID</th>
-              <th className="p-3">Name</th>
-              <th className="p-3">Phone</th>
-              <th className="p-3">Email</th>
-              <th className="p-3">Clinic</th>
-              <th className="p-3">Referrals</th>
-              <th className="p-3">View</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map((p: any) => (
-              <tr key={p.id} className="border-t">
-                <td className="p-3">{p.patient_id}</td>
-                <td className="p-3">{p.name}</td>
-                <td className="p-3">{p.phone || "-"}</td>
-                <td className="p-3">{p.email || "-"}</td>
-                <td className="p-3">{p.assigned_clinic || "-"}</td>
-                <td className="p-3">{p.referrals_count}</td>
-                <td className="p-3">
-                  <Link href={`/ops/patients/${p.id}`} className="text-blue-600 underline">
-                    Open
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+export default async function OpsPatientsPage({ searchParams }: Props) {
+  const sp = (await searchParams) || {}; const search=valueOf(sp.search); const hospital=valueOf(sp.hospital); const clinic=valueOf(sp.clinic); const payment_status=valueOf(sp.payment_status); const report_status=valueOf(sp.report_status); const referral_status=valueOf(sp.referral_status);
+  const patients = await serverFetch(`/api/ops/patients/${buildQuery({ search, hospital, clinic, payment_status, report_status, referral_status })}`);
+  return <div><h1 className="mb-2 text-3xl font-bold">Ops Patient Registry</h1><p className="mb-6 text-slate-500">Global patient registry across hospitals, clinics, reports, payments and images.</p><form className="mb-6 grid grid-cols-1 gap-3 rounded-xl bg-white p-4 shadow md:grid-cols-6"><input name="search" defaultValue={search} placeholder="Search patient/referral" className="rounded border px-3 py-2 text-sm md:col-span-2"/><input name="hospital" defaultValue={hospital} placeholder="Hospital ID" className="rounded border px-3 py-2 text-sm"/><input name="clinic" defaultValue={clinic} placeholder="Clinic ID" className="rounded border px-3 py-2 text-sm"/><select name="payment_status" defaultValue={payment_status} className="rounded border px-3 py-2 text-sm"><option value="">Payment: All</option><option value="not_created">Not Created</option><option value="draft">Draft</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="failed">Failed</option><option value="exception">Exception</option></select><select name="report_status" defaultValue={report_status} className="rounded border px-3 py-2 text-sm"><option value="">Report: All</option><option value="not_created">Not Created</option><option value="under_review">Under Review</option><option value="submitted_to_ops">Submitted to Ops</option><option value="issued">Issued</option><option value="ops_rejected">Rejected</option></select><select name="referral_status" defaultValue={referral_status} className="rounded border px-3 py-2 text-sm"><option value="">Referral: All</option><option value="submitted">Submitted</option><option value="clinic_matched">Clinic Matched</option><option value="in_clinic">In Clinic</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><button className="rounded bg-slate-950 px-4 py-2 text-sm font-semibold text-white md:col-span-6">Apply Filters</button></form><section className="rounded-xl bg-white p-6 shadow">{patients.length === 0 ? <p className="text-sm text-slate-500">No patients found.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-100 text-left"><tr><th className="p-3">Patient</th><th className="p-3">Hospital</th><th className="p-3">Clinic</th><th className="p-3">Referral</th><th className="p-3">Payment</th><th className="p-3">Report</th><th className="p-3">Images</th><th className="p-3">Open</th></tr></thead><tbody>{patients.map((p:any)=><tr key={p.id} className="border-t"><td className="p-3"><div className="font-medium">{p.name}</div><div className="text-xs text-slate-500">{p.patient_id}</div></td><td className="p-3">{p.source_hospital || "-"}</td><td className="p-3">{p.assigned_clinic || "-"}</td><td className="p-3"><Badge value={p.referral_status || "-"}/></td><td className="p-3"><Badge value={p.payment_status || "not_created"}/></td><td className="p-3"><Badge value={p.report_status || "not_created"}/></td><td className="p-3">{p.images_count || 0}</td><td className="p-3"><Link href={`/ops/patients/${p.id}`} className="text-blue-700 underline">Open</Link></td></tr>)}</tbody></table></div>}</section></div>;
 }
