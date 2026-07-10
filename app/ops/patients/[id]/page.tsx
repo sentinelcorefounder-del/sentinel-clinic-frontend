@@ -104,11 +104,27 @@ export default async function OpsPatientDetailPage({
             {uploads.map((u: any) => (
               <div key={u.id} className="border rounded p-3">
                 {u.url ? (
-                  <img src={u.url} alt="Retinal upload" className="w-full rounded mb-3" />
-                ) : null}
+                  <a href={u.url} target="_blank" rel="noreferrer">
+                    <img
+                      src={u.url}
+                      alt="Retinal upload"
+                      className="w-full rounded mb-3 border hover:opacity-90"
+                    />
+                  </a>
+                ) : (
+                  <div className="mb-3 rounded bg-slate-100 p-6 text-center text-sm text-slate-500">
+                    Image file unavailable
+                  </div>
+                )}
                 <p className="text-sm">Encounter: {u.encounter_id || "-"}</p>
                 <p className="text-sm">Eye: {u.eye_laterality || "-"}</p>
                 <p className="text-sm">Quality: {u.image_quality || "-"}</p>
+                <p className="text-sm">Uploaded: {u.uploaded_at || "-"}</p>
+                {u.url ? (
+                  <a href={u.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm text-blue-600 underline">
+                    Open full image
+                  </a>
+                ) : null}
               </div>
             ))}
           </div>

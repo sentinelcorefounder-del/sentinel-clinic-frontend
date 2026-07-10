@@ -44,6 +44,10 @@ export default async function OpsLayout({
               Referrals
             </Link>
 
+            <Link href="/ops/reports" className="block hover:text-blue-300">
+              Reports
+            </Link>
+
             <Link href="/ops/patients" className="block hover:text-blue-300">
               Patients
             </Link>
