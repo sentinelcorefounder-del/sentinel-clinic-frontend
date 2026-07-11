@@ -17,6 +17,7 @@ type HospitalReferral = {
   report_pk?: number;
   report_id_display?: string;
   report_pdf_url?: string;
+  report_status?: string;
   hospital_commission_amount: string;
   payout_status: string;
   payment_status?: string;
@@ -51,6 +52,9 @@ function statusBadge(status: string) {
 function displayStatus(status: string) {
   if (status === "clinic_matched") return "Clinic Matched";
   if (status === "in_clinic") return "In Clinic";
+  if (status === "report_created") return "Report Being Prepared";
+  if (status === "submitted_to_ops") return "Awaiting Sentinel Ops Review";
+  if (status === "returned_to_clinic") return "Returned to Clinic for Correction";
   if (status === "report_issued") return "Report Issued";
   if (status === "completed") return "Completed";
   if (status === "cancelled") return "Cancelled";
@@ -96,6 +100,7 @@ function displayPaymentAmount(referral: HospitalReferral) {
 }
 
 function reportUrl(referral: HospitalReferral) {
+  if (referral.report_status !== "issued") return "";
   if (referral.report_pdf_url) return referral.report_pdf_url;
   if (referral.report_pk) return getReportPdfUrl(referral.report_pk);
   return "";
@@ -233,7 +238,7 @@ export default function HospitalReferralsPage() {
                     </td>
 
                     <td className="p-4 text-sm text-slate-900">
-                      {referral.report_ready && pdfUrl ? (
+                      {referral.report_status === "issued" && referral.report_ready && pdfUrl ? (
                         <a
                           href={pdfUrl}
                           target="_blank"
@@ -243,7 +248,13 @@ export default function HospitalReferralsPage() {
                           View Report
                         </a>
                       ) : (
-                        <span className="text-slate-500">Report pending</span>
+                        <span className="text-slate-500">
+                          {referral.report_status === "submitted_to_ops"
+                            ? "Awaiting Sentinel Ops review"
+                            : referral.report_status === "returned_to_clinic" || referral.report_status === "ops_rejected"
+                              ? "Returned to clinic for correction"
+                              : "Report pending"}
+                        </span>
                       )}
 
                       {referral.report_id_display ? (

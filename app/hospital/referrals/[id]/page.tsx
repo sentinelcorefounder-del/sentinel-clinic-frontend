@@ -19,6 +19,7 @@ type HospitalReferralDetail = {
   matched_clinic_name: string;
   report_pk?: number;
   report_id_display?: string;
+  report_status?: string;
   referral_date: string | null;
   referral_status: string;
   report_ready: boolean;
@@ -136,7 +137,7 @@ export default function HospitalReferralDetailPage({ params }: Props) {
           <p><strong>Payout Date:</strong> {referral.payout_date || "-"}</p>
         </div>
 
-        {referral.report_ready && referral.report_pk ? (
+        {referral.report_status === "issued" && referral.report_ready && referral.report_pk ? (
           <div className="mt-6">
             <button
               type="button"

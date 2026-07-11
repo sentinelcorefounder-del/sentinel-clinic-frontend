@@ -596,3 +596,39 @@ export async function rejectOpsReport(reportId: string | number, note: string) {
   if (!res.ok) throw new Error(formatApiError(data, "Failed to reject report."));
   return data;
 }
+
+
+export async function fetchClinicReports(params?: { search?: string; status?: string }) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.status) query.set("status", params.status);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const res = await fetch(`${API_URL}/reports/clinic/${suffix}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load clinic reports."));
+  return data;
+}
+
+export async function fetchHospitalReports(search = "") {
+  const suffix = search ? `?search=${encodeURIComponent(search)}` : "";
+  const res = await fetch(`${API_URL}/referrals/hospital/reports/${suffix}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load hospital reports."));
+  return data;
+}
+
+export async function fetchHospitalReportById(id: string | number) {
+  const res = await fetch(`${API_URL}/referrals/hospital/reports/${id}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load hospital report."));
+  return data;
+}

@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createReport, getReportPdfUrl, submitReportToOps } from "@/lib/api";
+import {
+  createReport,
+  getReportPdfUrl,
+  submitReportToOps,
+  updateReport,
+} from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
+import type { StructuredReport } from "@/types/report";
 
 type Props = {
   encounterId: number;
   patientId: number;
   patientConsentStatus: string;
+  existingReport?: StructuredReport | null;
   encounter?: {
     left_unaided_va?: string;
     right_unaided_va?: string;
@@ -17,37 +24,13 @@ type Props = {
     poor_va_flag?: boolean;
     poor_va_reason?: string;
   } | null;
-  onReportCreated?: () => Promise<void> | void;
-};
-
-type CreatedReport = {
-  id: number;
-  report_id: string;
-  report_status?: string;
+  onReportSaved?: () => Promise<void> | void;
 };
 
 const ALLOWED_REPORT_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 
-const VA_OPTIONS = [
-  "",
-  "6/4",
-  "6/5",
-  "6/6",
-  "6/7.5",
-  "6/9",
-  "6/12",
-  "6/15",
-  "6/18",
-  "6/24",
-  "6/36",
-  "6/60",
-  "CF",
-  "HM",
-  "PL",
-  "NPL",
-];
-
+const VA_OPTIONS = ["", "6/4", "6/5", "6/6", "6/7.5", "6/9", "6/12", "6/15", "6/18", "6/24", "6/36", "6/60", "CF", "HM", "PL", "NPL"];
 const DR_GRADE_OPTIONS = [
   { value: "", label: "Not Recorded" },
   { value: "R0", label: "R0 - No DR" },
@@ -57,7 +40,6 @@ const DR_GRADE_OPTIONS = [
   { value: "R3S", label: "R3S - Stable treated proliferative DR" },
   { value: "U", label: "Ungradable" },
 ];
-
 const MACULOPATHY_OPTIONS = [
   { value: "", label: "Not Recorded" },
   { value: "M0", label: "M0 - No maculopathy" },
@@ -65,132 +47,93 @@ const MACULOPATHY_OPTIONS = [
   { value: "U", label: "Ungradable" },
 ];
 
-export default function ReportForm({
-  encounterId,
-  patientId,
-  patientConsentStatus,
-  encounter,
-  onReportCreated,
-}: Props) {
-  const router = useRouter();
-
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [createdReport, setCreatedReport] = useState<CreatedReport | null>(null);
-
-  const [formData, setFormData] = useState({
+function blankForm(encounterId: number, patientId: number, encounter?: Props["encounter"]) {
+  return {
     report_id: "",
     encounter: encounterId,
     patient: patientId,
     review_date: "",
-
-    left_unaided_va: "",
-    left_corrected_va: "",
+    left_unaided_va: encounter?.left_unaided_va || "",
+    left_corrected_va: encounter?.left_corrected_pinhole_va || "",
     left_dr_grade: "",
     left_maculopathy_grade: "",
-
-    right_unaided_va: "",
-    right_corrected_va: "",
+    right_unaided_va: encounter?.right_unaided_va || "",
+    right_corrected_va: encounter?.right_corrected_pinhole_va || "",
     right_dr_grade: "",
     right_maculopathy_grade: "",
-
     dr_grade: "",
     maculopathy_grade: "",
-
     ungradable: false,
     urgency_outcome: "routine_followup",
     recommendation: "",
     next_followup_interval: "",
-    report_status: "draft",
     notes: "",
-  });
+  };
+}
 
+export default function ReportForm({
+  encounterId,
+  patientId,
+  patientConsentStatus,
+  existingReport,
+  encounter,
+  onReportSaved,
+}: Props) {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [report, setReport] = useState<StructuredReport | null>(existingReport || null);
+  const [formData, setFormData] = useState(blankForm(encounterId, patientId, encounter));
   const [loading, setLoading] = useState(false);
   const [submittingToOps, setSubmittingToOps] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
 
   useEffect(() => {
-    async function loadUser() {
-      try {
-        const me = await getMe();
-        setCurrentUser(me);
-      } catch {
-        setCurrentUser(null);
-      } finally {
-        setAuthLoading(false);
-      }
-    }
-
-    loadUser();
+    getMe()
+      .then(setCurrentUser)
+      .catch(() => setCurrentUser(null))
+      .finally(() => setAuthLoading(false));
   }, []);
 
   useEffect(() => {
-    if (!encounter) return;
+    setReport(existingReport || null);
+    if (existingReport) {
+      setFormData({
+        report_id: existingReport.report_id || "",
+        encounter: existingReport.encounter,
+        patient: existingReport.patient,
+        review_date: existingReport.review_date || "",
+        left_unaided_va: existingReport.left_unaided_va || "",
+        left_corrected_va: existingReport.left_corrected_va || "",
+        left_dr_grade: existingReport.left_dr_grade || "",
+        left_maculopathy_grade: existingReport.left_maculopathy_grade || "",
+        right_unaided_va: existingReport.right_unaided_va || "",
+        right_corrected_va: existingReport.right_corrected_va || "",
+        right_dr_grade: existingReport.right_dr_grade || "",
+        right_maculopathy_grade: existingReport.right_maculopathy_grade || "",
+        dr_grade: existingReport.dr_grade || "",
+        maculopathy_grade: existingReport.maculopathy_grade || "",
+        ungradable: !!existingReport.ungradable,
+        urgency_outcome: existingReport.urgency_outcome || "routine_followup",
+        recommendation: existingReport.recommendation || "",
+        next_followup_interval: existingReport.next_followup_interval || "",
+        notes: existingReport.notes || "",
+      });
+    } else {
+      setFormData(blankForm(encounterId, patientId, encounter));
+    }
+  }, [existingReport, encounterId, patientId, encounter]);
 
-    setFormData((prev) => ({
-      ...prev,
-      left_unaided_va: prev.left_unaided_va || encounter.left_unaided_va || "",
-      right_unaided_va: prev.right_unaided_va || encounter.right_unaided_va || "",
-      left_corrected_va:
-        prev.left_corrected_va || encounter.left_corrected_pinhole_va || "",
-      right_corrected_va:
-        prev.right_corrected_va || encounter.right_corrected_pinhole_va || "",
-    }));
-  }, [encounter]);
+  const isExisting = !!report?.id;
+  const isEditable = !report || ["draft", "under_review", "signed_off", "returned_to_clinic", "ops_rejected"].includes(report.report_status || "");
+  const canSubmit = !!report && ["draft", "under_review", "signed_off", "returned_to_clinic", "ops_rejected"].includes(report.report_status || "");
 
-  function normaliseVa(value: string) {
-    return (value || "").trim().toLowerCase().replaceAll(" ", "");
-  }
-
-  function isPoorCorrectedPinholeVa(value: string) {
-    return new Set([
-      "6/12",
-      "6/15",
-      "6/18",
-      "6/24",
-      "6/36",
-      "6/60",
-      "cf",
-      "countingfingers",
-      "hm",
-      "handmovements",
-      "pl",
-      "npl",
-      "nlp",
-    ]).has(normaliseVa(value));
-  }
-
-  const poorVaFlag =
-    isPoorCorrectedPinholeVa(formData.left_corrected_va) ||
-    isPoorCorrectedPinholeVa(formData.right_corrected_va);
-
-  const poorVaReason = [
-    isPoorCorrectedPinholeVa(formData.left_corrected_va)
-      ? `Left corrected/pinhole VA is ${formData.left_corrected_va}`
-      : "",
-    isPoorCorrectedPinholeVa(formData.right_corrected_va)
-      ? `Right corrected/pinhole VA is ${formData.right_corrected_va}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("; ");
-
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const fieldName = e.target.name;
-    const value =
-      fieldName === "ungradable"
-        ? (e.target as HTMLInputElement).checked
-        : e.target.value;
-
+    const value = fieldName === "ungradable" ? (e.target as HTMLInputElement).checked : e.target.value;
     setFormData((prev) => {
-      const next = {
-        ...prev,
-        [fieldName]: value,
-      };
-
+      const next = { ...prev, [fieldName]: value };
       if (fieldName === "ungradable" && value === true) {
         next.urgency_outcome = "image_retake";
         next.left_dr_grade = "U";
@@ -198,337 +141,115 @@ export default function ReportForm({
         next.right_dr_grade = "U";
         next.right_maculopathy_grade = "U";
       }
-
-      if (fieldName === "urgency_outcome" && value === "image_retake") {
-        next.ungradable = true;
-      }
-
+      if (fieldName === "urgency_outcome" && value === "image_retake") next.ungradable = true;
       return next;
     });
   }
 
-  function handleGeneratePdf() {
-    if (!createdReport?.id) return;
-
-    window.open(
-      getReportPdfUrl(createdReport.id),
-      "_blank",
-      "noopener,noreferrer"
-    );
+  async function refresh() {
+    await onReportSaved?.();
+    router.refresh();
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setMessage("");
-    setMessageType("info");
-    setCreatedReport(null);
-
-    const allowed = hasAnyRole(currentUser, ALLOWED_REPORT_ROLES);
-
-    if (!allowed) {
+    if (!hasAnyRole(currentUser, ALLOWED_REPORT_ROLES)) {
       setMessageType("error");
-      setMessage("You do not have permission to create reports.");
-      setLoading(false);
+      setMessage("You do not have permission to create or update reports.");
+      return;
+    }
+    if (!isEditable) {
+      setMessageType("error");
+      setMessage(`This report is ${report?.report_status?.replaceAll("_", " ")} and is read-only.`);
       return;
     }
 
     try {
+      setLoading(true);
+      setMessage("");
       const payload = {
         ...formData,
-
-        // Legacy whole-report fields for backwards compatibility.
-        dr_grade:
-          formData.right_dr_grade ||
-          formData.left_dr_grade ||
-          formData.dr_grade ||
-          "",
-        maculopathy_grade:
-          formData.right_maculopathy_grade ||
-          formData.left_maculopathy_grade ||
-          formData.maculopathy_grade ||
-          "",
+        dr_grade: formData.right_dr_grade || formData.left_dr_grade || formData.dr_grade || "",
+        maculopathy_grade: formData.right_maculopathy_grade || formData.left_maculopathy_grade || formData.maculopathy_grade || "",
       };
-
-      const created = await createReport(payload);
-
-      setCreatedReport({
-        id: created.id,
-        report_id: created.report_id,
-        report_status: created.report_status,
-      });
-
+      const saved = isExisting
+        ? await updateReport(report!.id, payload)
+        : await createReport(payload);
+      setReport(saved);
       setMessageType("success");
-      setMessage("Report created successfully.");
-
-      setFormData((prev) => ({
-        ...prev,
-        report_id: "",
-        review_date: "",
-
-        left_unaided_va: encounter?.left_unaided_va || "",
-        left_corrected_va: encounter?.left_corrected_pinhole_va || "",
-        left_dr_grade: "",
-        left_maculopathy_grade: "",
-
-        right_unaided_va: encounter?.right_unaided_va || "",
-        right_corrected_va: encounter?.right_corrected_pinhole_va || "",
-        right_dr_grade: "",
-        right_maculopathy_grade: "",
-
-        dr_grade: "",
-        maculopathy_grade: "",
-
-        recommendation: "",
-        next_followup_interval: "",
-        notes: "",
-        report_status: "draft",
-        urgency_outcome: "routine_followup",
-        ungradable: false,
-      }));
-
-      if (onReportCreated) {
-        await onReportCreated();
-      }
-
-      router.refresh();
+      setMessage(isExisting ? "Report saved successfully." : "Report created successfully.");
+      await refresh();
     } catch (error) {
-      const nextMessage =
-        error instanceof Error ? error.message : "Failed to create report.";
       setMessageType("error");
-      setMessage(nextMessage);
+      setMessage(error instanceof Error ? error.message : "Failed to save report.");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSubmitToOps() {
-    if (!createdReport?.id) return;
-
-    const allowed = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
-
-    if (!allowed) {
+    if (!report?.id) return;
+    if (!hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES)) {
       setMessageType("error");
       setMessage("You do not have permission to submit reports to Ops.");
       return;
     }
-
     try {
       setSubmittingToOps(true);
-      setMessage("");
-      setMessageType("info");
-
-      const response = await submitReportToOps(createdReport.id);
-
-      setCreatedReport((prev) =>
-        prev
-          ? {
-              ...prev,
-              report_status: response.report_status ?? "submitted_to_ops",
-            }
-          : prev
-      );
-
+      const response = await submitReportToOps(report.id);
+      setReport((current) => current ? { ...current, report_status: response.report_status || "submitted_to_ops" } : current);
       setMessageType("success");
       setMessage("Report submitted to Ops successfully.");
-
-      if (onReportCreated) {
-        await onReportCreated();
-      }
-
-      router.refresh();
+      await refresh();
     } catch (error) {
-      const nextMessage =
-        error instanceof Error ? error.message : "Failed to submit report to Ops.";
       setMessageType("error");
-      setMessage(nextMessage);
+      setMessage(error instanceof Error ? error.message : "Failed to submit report to Ops.");
     } finally {
       setSubmittingToOps(false);
     }
   }
 
-  if (authLoading) {
-    return (
-      <div className="space-y-2 rounded-lg border p-4">
-        <h2 className="text-xl font-semibold">Create Structured Report</h2>
-        <p className="text-sm text-gray-600">Checking permissions...</p>
-      </div>
-    );
+  if (authLoading) return <div className="rounded-lg border p-4">Checking permissions...</div>;
+  if (!hasAnyRole(currentUser, ALLOWED_REPORT_ROLES)) return <div className="rounded-lg border bg-gray-50 p-4">You do not have permission to create or update reports.</div>;
+  if ((patientConsentStatus || "").trim().toLowerCase() !== "completed") {
+    return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800">Report creation is blocked until patient consent is completed.</div>;
   }
-
-  const allowed = hasAnyRole(currentUser, ALLOWED_REPORT_ROLES);
-
-  if (!allowed) {
-    return (
-      <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
-        <h2 className="text-xl font-semibold">Create Structured Report</h2>
-        <p className="text-sm text-gray-600">
-          You do not have permission to create or update reports.
-        </p>
-      </div>
-    );
-  }
-
-  const consentComplete =
-    (patientConsentStatus || "").trim().toLowerCase() === "completed";
-
-  if (!consentComplete) {
-    return (
-      <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-4">
-        <h2 className="text-xl font-semibold">Create Structured Report</h2>
-        <p className="text-sm text-amber-800">
-          Report creation is blocked until patient consent is completed.
-        </p>
-        <p className="text-xs text-amber-700">
-          Current consent status: {patientConsentStatus || "pending"}
-        </p>
-      </div>
-    );
-  }
-
-  const canSubmitCreatedReportToOps =
-    !!createdReport &&
-    hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES) &&
-    ["draft", "under_review", "signed_off", undefined].includes(
-      createdReport.report_status as
-        | "draft"
-        | "under_review"
-        | "signed_off"
-        | undefined
-    );
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <h2 className="text-xl font-semibold">Create Structured Report</h2>
+          <h2 className="text-xl font-semibold">{isExisting ? "Edit Structured Report" : "Create Structured Report"}</h2>
           <p className="mt-1 text-sm text-gray-600">
-            VA values are copied from the technician encounter capture by default.
-            The optometrist can leave them as-is or override them if clinically needed.
+            {isExisting ? "Changes update the existing report for this encounter. A second report cannot be created." : "Create the single structured report for this encounter."}
           </p>
         </div>
 
-        {poorVaFlag ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <p className="font-semibold">Poor corrected/pinhole VA flag</p>
-            <p className="mt-1">
-              {poorVaReason ||
-                encounter?.poor_va_reason ||
-                "Corrected/pinhole VA is 6/12 or worse. Consider whether referral is required based on clinical judgement."}
-            </p>
+        {report?.return_reason || report?.ops_review_note ? (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Sentinel Ops correction request</p>
+            <p>{report.return_reason || report.ops_review_note}</p>
           </div>
         ) : null}
 
-        <input
-          name="report_id"
-          value={formData.report_id}
-          onChange={handleChange}
-          placeholder="Report ID"
-          className="w-full rounded border p-3"
-          required
-        />
-
-        <input
-          name="review_date"
-          type="date"
-          value={formData.review_date}
-          onChange={handleChange}
-          className="w-full rounded border p-3"
-          required
-        />
-
-        <div className="rounded-lg border bg-slate-50 p-4">
-          <h3 className="mb-3 font-semibold">Left Eye</h3>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <SelectField
-              label="Left Unaided VA"
-              name="left_unaided_va"
-              value={formData.left_unaided_va}
-              onChange={handleChange}
-              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
-            />
-
-            <SelectField
-              label="Left Corrected / Pinhole VA"
-              name="left_corrected_va"
-              value={formData.left_corrected_va}
-              onChange={handleChange}
-              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
-            />
-
-            <SelectField
-              label="Left DR Grade"
-              name="left_dr_grade"
-              value={formData.left_dr_grade}
-              onChange={handleChange}
-              options={DR_GRADE_OPTIONS}
-            />
-
-            <SelectField
-              label="Left Maculopathy Grade"
-              name="left_maculopathy_grade"
-              value={formData.left_maculopathy_grade}
-              onChange={handleChange}
-              options={MACULOPATHY_OPTIONS}
-            />
+        {!isEditable ? (
+          <div className="rounded-lg border bg-slate-100 p-3 text-sm">
+            This report is currently <strong>{report?.report_status?.replaceAll("_", " ")}</strong> and cannot be edited.
           </div>
-        </div>
+        ) : null}
 
-        <div className="rounded-lg border bg-slate-50 p-4">
-          <h3 className="mb-3 font-semibold">Right Eye</h3>
+        <input name="report_id" value={formData.report_id} onChange={handleChange} placeholder="Report ID" className="w-full rounded border p-3" required disabled={isExisting || !isEditable} />
+        <input name="review_date" type="date" value={formData.review_date} onChange={handleChange} className="w-full rounded border p-3" required disabled={!isEditable} />
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <SelectField
-              label="Right Unaided VA"
-              name="right_unaided_va"
-              value={formData.right_unaided_va}
-              onChange={handleChange}
-              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
-            />
-
-            <SelectField
-              label="Right Corrected / Pinhole VA"
-              name="right_corrected_va"
-              value={formData.right_corrected_va}
-              onChange={handleChange}
-              options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))}
-            />
-
-            <SelectField
-              label="Right DR Grade"
-              name="right_dr_grade"
-              value={formData.right_dr_grade}
-              onChange={handleChange}
-              options={DR_GRADE_OPTIONS}
-            />
-
-            <SelectField
-              label="Right Maculopathy Grade"
-              name="right_maculopathy_grade"
-              value={formData.right_maculopathy_grade}
-              onChange={handleChange}
-              options={MACULOPATHY_OPTIONS}
-            />
-          </div>
-        </div>
+        <EyeSection title="Left Eye" prefix="left" data={formData} onChange={handleChange} disabled={!isEditable} />
+        <EyeSection title="Right Eye" prefix="right" data={formData} onChange={handleChange} disabled={!isEditable} />
 
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="ungradable"
-            checked={formData.ungradable}
-            onChange={handleChange}
-          />
+          <input type="checkbox" name="ungradable" checked={formData.ungradable} onChange={handleChange} disabled={!isEditable} />
           Ungradable / image retake required
         </label>
 
-        <select
-          name="urgency_outcome"
-          value={formData.urgency_outcome}
-          onChange={handleChange}
-          className="w-full rounded border p-3"
-        >
+        <select name="urgency_outcome" value={formData.urgency_outcome} onChange={handleChange} className="w-full rounded border p-3" disabled={!isEditable}>
           <option value="routine_followup">Routine Follow-up</option>
           <option value="early_review">Early Review</option>
           <option value="urgent_referral">Urgent Referral</option>
@@ -536,135 +257,56 @@ export default function ReportForm({
           <option value="image_retake">Image Retake</option>
         </select>
 
-        <input
-          name="next_followup_interval"
-          value={formData.next_followup_interval}
-          onChange={handleChange}
-          placeholder="Next Follow-up Interval"
-          className="w-full rounded border p-3"
-        />
+        <input name="next_followup_interval" value={formData.next_followup_interval} onChange={handleChange} placeholder="Next Follow-up Interval" className="w-full rounded border p-3" disabled={!isEditable} />
+        <textarea name="recommendation" value={formData.recommendation} onChange={handleChange} placeholder="Recommendation" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
+        <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Notes" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
 
-        <select
-          name="report_status"
-          value={formData.report_status}
-          onChange={handleChange}
-          className="w-full rounded border p-3"
-        >
-          <option value="draft">Draft</option>
-          <option value="under_review">Under Review</option>
-          <option value="signed_off">Signed Off</option>
-          <option value="issued">Issued</option>
-        </select>
-
-        <textarea
-          name="recommendation"
-          value={formData.recommendation}
-          onChange={handleChange}
-          placeholder="Recommendation"
-          className="w-full rounded border p-3"
-          rows={4}
-        />
-
-        <textarea
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          placeholder="Notes"
-          className="w-full rounded border p-3"
-          rows={4}
-        />
-
-        {message ? (
-          <div
-            className={`rounded-lg border p-3 text-sm font-medium ${
-              messageType === "error"
-                ? "border-red-200 bg-red-50 text-red-800"
-                : messageType === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-slate-200 bg-slate-50 text-slate-700"
-            }`}
-          >
-            {message}
-          </div>
-        ) : null}
+        {message ? <div className={`rounded-lg border p-3 text-sm font-medium ${messageType === "error" ? "border-red-200 bg-red-50 text-red-800" : messageType === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>{message}</div> : null}
 
         <div className="flex flex-wrap gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50"
-          >
-            {loading ? "Saving..." : "Create Report"}
-          </button>
+          {isEditable ? (
+            <button type="submit" disabled={loading} className="rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50">
+              {loading ? "Saving..." : isExisting ? "Save Report" : "Create Report"}
+            </button>
+          ) : null}
 
-          {createdReport ? (
-            <button
-              type="button"
-              onClick={handleGeneratePdf}
-              className="rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700"
-            >
+          {report?.id ? (
+            <button type="button" onClick={() => window.open(getReportPdfUrl(report.id), "_blank", "noopener,noreferrer")} className="rounded-lg bg-blue-600 px-4 py-3 text-white">
               Generate PDF
             </button>
           ) : null}
 
-          {canSubmitCreatedReportToOps ? (
-            <button
-              type="button"
-              onClick={handleSubmitToOps}
-              disabled={submittingToOps}
-              className="rounded-lg bg-emerald-600 px-4 py-3 text-white hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {submittingToOps ? "Submitting..." : "Submit to Ops"}
+          {canSubmit ? (
+            <button type="button" onClick={handleSubmitToOps} disabled={submittingToOps} className="rounded-lg bg-emerald-600 px-4 py-3 text-white disabled:opacity-50">
+              {submittingToOps ? "Submitting..." : report?.report_status === "returned_to_clinic" || report?.report_status === "ops_rejected" ? "Resubmit to Ops" : "Submit to Ops"}
             </button>
           ) : null}
         </div>
-
-        {createdReport ? (
-          <div className="space-y-1">
-            <p className="text-sm text-gray-600">
-              PDF ready for report: {createdReport.report_id}
-            </p>
-            {createdReport.report_status ? (
-              <p className="text-xs text-gray-500">
-                Current workflow status: {createdReport.report_status}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
       </form>
     </div>
   );
 }
 
-function SelectField({
-  label,
-  name,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  name: string;
-  value: string;
-  onChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => void;
-  options: { value: string; label: string }[];
-}) {
+function EyeSection({ title, prefix, data, onChange, disabled }: any) {
+  return (
+    <div className="rounded-lg border bg-slate-50 p-4">
+      <h3 className="mb-3 font-semibold">{title}</h3>
+      <div className="grid gap-3 md:grid-cols-2">
+        <SelectField label="Unaided VA" name={`${prefix}_unaided_va`} value={data[`${prefix}_unaided_va`]} onChange={onChange} options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))} disabled={disabled} />
+        <SelectField label="Corrected / Pinhole VA" name={`${prefix}_corrected_va`} value={data[`${prefix}_corrected_va`]} onChange={onChange} options={VA_OPTIONS.map((v) => ({ value: v, label: v || "Not Recorded" }))} disabled={disabled} />
+        <SelectField label="DR Grade" name={`${prefix}_dr_grade`} value={data[`${prefix}_dr_grade`]} onChange={onChange} options={DR_GRADE_OPTIONS} disabled={disabled} />
+        <SelectField label="Maculopathy Grade" name={`${prefix}_maculopathy_grade`} value={data[`${prefix}_maculopathy_grade`]} onChange={onChange} options={MACULOPATHY_OPTIONS} disabled={disabled} />
+      </div>
+    </div>
+  );
+}
+
+function SelectField({ label, name, value, onChange, options, disabled }: any) {
   return (
     <label className="space-y-1 text-sm">
       <span className="font-medium">{label}</span>
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        className="w-full rounded border bg-white p-3"
-      >
-        {options.map((option) => (
-          <option key={`${name}-${option.value}`} value={option.value}>
-            {option.label}
-          </option>
-        ))}
+      <select name={name} value={value} onChange={onChange} className="w-full rounded border bg-white p-3" disabled={disabled}>
+        {options.map((option: any) => <option key={`${name}-${option.value}`} value={option.value}>{option.label}</option>)}
       </select>
     </label>
   );

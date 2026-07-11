@@ -13,7 +13,6 @@ import {
   getReportPdfUrl,
   submitReportToOps,
   deleteImageUpload,
-  updateReport,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter } from "@/types/encounter";
@@ -285,25 +284,6 @@ export default function EncounterDetailPage({ params }: Props) {
     return ["draft", "under_review", "signed_off", "ops_rejected", "returned_to_clinic"].includes(reportStatus || "");
   }
 
-  async function handleReturnedReportUpdate(report: any) {
-    try {
-      setReportActionMessage("");
-      await updateReport(report.id, {
-        recommendation: report.recommendation,
-        notes: report.notes,
-        left_dr_grade: report.left_dr_grade,
-        left_maculopathy_grade: report.left_maculopathy_grade,
-        right_dr_grade: report.right_dr_grade,
-        right_maculopathy_grade: report.right_maculopathy_grade,
-        urgency_outcome: report.urgency_outcome,
-        next_followup_interval: report.next_followup_interval,
-      });
-      await handleReportCreated();
-      setReportActionMessage("Returned report changes saved. You can now resubmit it to Ops.");
-    } catch (err) {
-      setReportActionMessage(err instanceof Error ? err.message : "Failed to update returned report.");
-    }
-  }
 
   const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
   const canDeleteUploads = hasAnyRole(currentUser, ALLOWED_DELETE_UPLOAD_ROLES);
@@ -748,7 +728,8 @@ export default function EncounterDetailPage({ params }: Props) {
           patientId={encounter.patient}
           patientConsentStatus={patient.consent_status || "pending"}
           encounter={encounterAny}
-          onReportCreated={handleReportCreated}
+          existingReport={reports[0] || null}
+          onReportSaved={handleReportCreated}
         />
       </section>
 
@@ -870,16 +851,6 @@ export default function EncounterDetailPage({ params }: Props) {
                   >
                     Generate PDF
                   </button>
-
-                  {["returned_to_clinic", "ops_rejected"].includes(report.report_status || "") ? (
-                    <button
-                      type="button"
-                      onClick={() => handleReturnedReportUpdate(report)}
-                      className="rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800"
-                    >
-                      Save Corrections
-                    </button>
-                  ) : null}
 
                   {canSubmitToOps && canSubmitReport(report.report_status) ? (
                     <button

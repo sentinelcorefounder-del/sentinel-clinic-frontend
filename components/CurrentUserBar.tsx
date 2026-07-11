@@ -106,6 +106,9 @@ function ClinicNav({ user }: { user: CurrentUser }) {
       <Link href="/encounters" className="hover:text-slate-950 hover:underline">
         Encounters
       </Link>
+      <Link href="/reports" className="hover:text-slate-950 hover:underline">
+        Reports
+      </Link>
 
       {isOps ? (
         <Link
@@ -130,6 +133,9 @@ function HospitalNav() {
       </Link>
       <Link href="/hospital/referrals" className="hover:text-slate-950 hover:underline">
         Referrals
+      </Link>
+      <Link href="/hospital/reports" className="hover:text-slate-950 hover:underline">
+        Reports
       </Link>
       <Link href="/hospital/payouts" className="hover:text-slate-950 hover:underline">
         Payouts
