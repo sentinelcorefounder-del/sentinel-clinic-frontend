@@ -535,3 +535,64 @@ export async function fetchPatientUploads(id: string | number) {
 
   return res.json();
 }
+
+
+export async function updateReport(reportId: string | number, data: any) {
+  const res = await fetch(`${API_URL}/reports/${reportId}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(responseData, "Failed to update report."));
+  }
+  return responseData;
+}
+
+export async function fetchOpsReport(reportId: string | number) {
+  const res = await fetch(`${API_URL}/ops/reports/${reportId}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load Ops report."));
+  return data;
+}
+
+export async function returnOpsReport(reportId: string | number, reason: string) {
+  const res = await fetch(`${API_URL}/ops/reports/${reportId}/return/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ reason }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to return report."));
+  return data;
+}
+
+export async function approveAndIssueOpsReport(reportId: string | number, note = "") {
+  const res = await fetch(`${API_URL}/ops/reports/${reportId}/approve/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ note }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to issue report."));
+  return data;
+}
+
+export async function rejectOpsReport(reportId: string | number, note: string) {
+  const res = await fetch(`${API_URL}/ops/reports/${reportId}/reject/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ note }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to reject report."));
+  return data;
+}

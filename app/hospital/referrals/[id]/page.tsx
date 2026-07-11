@@ -11,18 +11,16 @@ type Props = {
 type HospitalReferralDetail = {
   id: number;
   referral_id: string;
-  patient_id_display: string;
-  patient_first_name: string;
-  patient_last_name: string;
+  patient_linked_id?: string;
+  patient_id_text?: string;
+  first_name: string;
+  last_name: string;
   source_hospital_name: string;
   matched_clinic_name: string;
   report_pk?: number;
   report_id_display?: string;
   referral_date: string | null;
   referral_status: string;
-  appointment_date: string | null;
-  appointment_status: string;
-  no_show: boolean;
   report_ready: boolean;
   hospital_commission_amount: string;
   payout_status: string;
@@ -111,8 +109,8 @@ export default function HospitalReferralDetailPage({ params }: Props) {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2">
           <p><strong>Referral ID:</strong> {referral.referral_id}</p>
-          <p><strong>Patient ID:</strong> {referral.patient_id_display}</p>
-          <p><strong>Patient:</strong> {referral.patient_first_name} {referral.patient_last_name}</p>
+          <p><strong>Patient ID:</strong> {referral.patient_linked_id || referral.patient_id_text || "-"}</p>
+          <p><strong>Patient:</strong> {referral.first_name} {referral.last_name}</p>
           <p><strong>Hospital:</strong> {referral.source_hospital_name}</p>
           <p><strong>Matched Clinic:</strong> {referral.matched_clinic_name || "-"}</p>
 
@@ -124,9 +122,6 @@ export default function HospitalReferralDetailPage({ params }: Props) {
           </div>
 
           <p><strong>Referral Date:</strong> {referral.referral_date || "-"}</p>
-          <p><strong>Appointment Date:</strong> {referral.appointment_date || "-"}</p>
-          <p><strong>Appointment Status:</strong> {referral.appointment_status || "-"}</p>
-          <p><strong>No-show:</strong> {referral.no_show ? "Yes" : "No"}</p>
           <p><strong>Report Ready:</strong> {referral.report_ready ? "Yes" : "No"}</p>
           <p><strong>Report ID:</strong> {referral.report_id_display || "-"}</p>
           <p><strong>Hospital Commission:</strong> ₦{referral.hospital_commission_amount}</p>

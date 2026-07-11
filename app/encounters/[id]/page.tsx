@@ -13,6 +13,7 @@ import {
   getReportPdfUrl,
   submitReportToOps,
   deleteImageUpload,
+  updateReport,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter } from "@/types/encounter";
@@ -281,7 +282,27 @@ export default function EncounterDetailPage({ params }: Props) {
   }
 
   function canSubmitReport(reportStatus?: string) {
-    return ["draft", "under_review", "signed_off"].includes(reportStatus || "");
+    return ["draft", "under_review", "signed_off", "ops_rejected", "returned_to_clinic"].includes(reportStatus || "");
+  }
+
+  async function handleReturnedReportUpdate(report: any) {
+    try {
+      setReportActionMessage("");
+      await updateReport(report.id, {
+        recommendation: report.recommendation,
+        notes: report.notes,
+        left_dr_grade: report.left_dr_grade,
+        left_maculopathy_grade: report.left_maculopathy_grade,
+        right_dr_grade: report.right_dr_grade,
+        right_maculopathy_grade: report.right_maculopathy_grade,
+        urgency_outcome: report.urgency_outcome,
+        next_followup_interval: report.next_followup_interval,
+      });
+      await handleReportCreated();
+      setReportActionMessage("Returned report changes saved. You can now resubmit it to Ops.");
+    } catch (err) {
+      setReportActionMessage(err instanceof Error ? err.message : "Failed to update returned report.");
+    }
   }
 
   const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
@@ -758,6 +779,12 @@ export default function EncounterDetailPage({ params }: Props) {
                     <p>
                       <strong>Status:</strong> {displayValue(report.report_status)}
                     </p>
+                    {report.return_reason || report.ops_review_note ? (
+                      <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        <p className="font-semibold">Sentinel Ops review note</p>
+                        <p>{report.return_reason || report.ops_review_note}</p>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
@@ -843,6 +870,16 @@ export default function EncounterDetailPage({ params }: Props) {
                   >
                     Generate PDF
                   </button>
+
+                  {["returned_to_clinic", "ops_rejected"].includes(report.report_status || "") ? (
+                    <button
+                      type="button"
+                      onClick={() => handleReturnedReportUpdate(report)}
+                      className="rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800"
+                    >
+                      Save Corrections
+                    </button>
+                  ) : null}
 
                   {canSubmitToOps && canSubmitReport(report.report_status) ? (
                     <button
