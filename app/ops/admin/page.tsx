@@ -50,6 +50,16 @@ const emptyOrg = {
   screening_fee_amount: "15000",
   hospital_commission_amount: "0",
   currency: "NGN",
+  workflow_mode: "sentinel_managed",
+  referral_requirement: "required",
+  patient_ownership: "shared",
+  default_payment_responsibility: "hospital",
+  branding_policy: "organization_and_sentinel",
+  subscription_tier: "pilot",
+  can_create_direct_patients: false,
+  electronic_signature_required: false,
+  ai_enabled: true,
+  clinic_direct_screening_enabled: false,
 };
 
 const emptyOpsUser = {
@@ -179,6 +189,7 @@ export default function OpsAdminPage() {
           loading={loading === "clinic"}
           buttonLabel="Create Clinic + Send Onboarding Email"
           onSubmit={createClinic}
+          showCapabilityFields
         />
       </div>
 
@@ -243,6 +254,7 @@ function OrgForm({
   buttonLabel,
   onSubmit,
   showPricingFields = false,
+  showCapabilityFields = false,
 }: {
   title: string;
   codeLabel: string;
@@ -253,6 +265,7 @@ function OrgForm({
   buttonLabel: string;
   onSubmit: () => void;
   showPricingFields?: boolean;
+  showCapabilityFields?: boolean;
 }) {
   return (
     <section className="rounded-xl border bg-white p-6 shadow-sm">
@@ -327,6 +340,184 @@ function OrgForm({
         </>
       ) : null}
 
+
+      {showCapabilityFields ? (
+        <>
+          <hr className="my-5" />
+
+          <h3 className="mb-3 font-semibold">
+            Clinic Capability Profile
+          </h3>
+
+          <SelectInput
+            label="Workflow Mode"
+            value={data.workflow_mode}
+            onChange={(value) =>
+              setData({
+                ...data,
+                workflow_mode: value,
+              })
+            }
+            options={[
+              ["sentinel_managed", "Sentinel Managed"],
+              ["clinic_managed", "Clinic Managed"],
+              ["hybrid", "Hybrid"],
+            ]}
+          />
+
+          <SelectInput
+            label="Referral Requirement"
+            value={data.referral_requirement}
+            onChange={(value) =>
+              setData({
+                ...data,
+                referral_requirement: value,
+              })
+            }
+            options={[
+              ["required", "Required"],
+              ["optional", "Optional"],
+              ["not_required", "Not Required"],
+            ]}
+          />
+
+          <SelectInput
+            label="Patient Ownership"
+            value={data.patient_ownership}
+            onChange={(value) =>
+              setData({
+                ...data,
+                patient_ownership: value,
+              })
+            }
+            options={[
+              ["hospital", "Hospital"],
+              ["clinic", "Clinic"],
+              ["shared", "Shared"],
+            ]}
+          />
+
+          <SelectInput
+            label="Default Payment Responsibility"
+            value={data.default_payment_responsibility}
+            onChange={(value) =>
+              setData({
+                ...data,
+                default_payment_responsibility: value,
+              })
+            }
+            options={[
+              ["patient", "Patient"],
+              ["clinic", "Clinic"],
+              ["hospital", "Hospital"],
+              ["programme", "Programme Sponsor"],
+              ["waived", "Waived"],
+            ]}
+          />
+
+          <SelectInput
+            label="Branding Policy"
+            value={data.branding_policy}
+            onChange={(value) =>
+              setData({
+                ...data,
+                branding_policy: value,
+              })
+            }
+            options={[
+              ["sentinel_only", "Sentinel Only"],
+              ["organization_only", "Clinic Only"],
+              [
+                "organization_and_sentinel",
+                "Clinic + Sentinel",
+              ],
+              [
+                "hospital_and_sentinel",
+                "Hospital + Sentinel",
+              ],
+              [
+                "hospital_clinic_sentinel",
+                "Hospital + Clinic + Sentinel",
+              ],
+            ]}
+          />
+
+          <SelectInput
+            label="Subscription Tier"
+            value={data.subscription_tier}
+            onChange={(value) =>
+              setData({
+                ...data,
+                subscription_tier: value,
+              })
+            }
+            options={[
+              ["pilot", "Pilot"],
+              ["clinic_core", "Clinic Core"],
+              ["managed_review", "Managed Review"],
+              ["hybrid", "Hybrid"],
+              ["enterprise", "Enterprise"],
+            ]}
+          />
+
+          <BooleanInput
+            label="Clinic may create direct patients"
+            checked={data.can_create_direct_patients}
+            onChange={(checked) =>
+              setData({
+                ...data,
+                can_create_direct_patients: checked,
+              })
+            }
+          />
+
+          <BooleanInput
+            label="Clinic-direct diabetic screening enabled"
+            checked={
+              data.clinic_direct_screening_enabled
+            }
+            onChange={(checked) =>
+              setData({
+                ...data,
+                clinic_direct_screening_enabled:
+                  checked,
+              })
+            }
+          />
+
+          <BooleanInput
+            label="Electronic signature required"
+            checked={
+              data.electronic_signature_required
+            }
+            onChange={(checked) =>
+              setData({
+                ...data,
+                electronic_signature_required:
+                  checked,
+              })
+            }
+          />
+
+          <BooleanInput
+            label="AI enabled"
+            checked={data.ai_enabled}
+            onChange={(checked) =>
+              setData({
+                ...data,
+                ai_enabled: checked,
+              })
+            }
+          />
+
+          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+            Sprint 4.1 stores these settings. Clinic-direct
+            patient creation and workflow-aware report actions
+            are enabled in the following Sprint 4 stages.
+          </p>
+        </>
+      ) : null}
+
       <hr className="my-5" />
 
       <h3 className="mb-3 font-semibold">Admin Account</h3>
@@ -397,6 +588,63 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded border px-3 py-2"
       />
+    </label>
+  );
+}
+
+
+function SelectInput({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+}) {
+  return (
+    <label className="mb-3 block">
+      <span className="mb-1 block text-sm font-medium">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+        className="w-full rounded border px-3 py-2"
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function BooleanInput({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="mb-3 flex items-center gap-3 rounded border bg-slate-50 p-3 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) =>
+          onChange(event.target.checked)
+        }
+      />
+      <span>{label}</span>
     </label>
   );
 }

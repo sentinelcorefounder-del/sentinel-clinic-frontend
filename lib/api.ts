@@ -745,3 +745,106 @@ export async function fetchHospitalPatientById(
 
   return data;
 }
+
+
+
+export type OrganizationCapabilityProfile = {
+  id: number;
+  organization: number;
+  organization_name: string;
+  organization_code: string;
+  organization_type: string;
+  workflow_mode:
+    | "sentinel_managed"
+    | "clinic_managed"
+    | "hybrid";
+  referral_requirement:
+    | "required"
+    | "optional"
+    | "not_required";
+  patient_ownership: "hospital" | "clinic" | "shared";
+  can_create_direct_patients: boolean;
+  can_issue_reports_directly: boolean;
+  electronic_signature_required: boolean;
+  sentinel_review_policy:
+    | "mandatory"
+    | "optional"
+    | "unavailable";
+  default_payment_responsibility:
+    | "patient"
+    | "clinic"
+    | "hospital"
+    | "programme"
+    | "waived";
+  branding_policy:
+    | "sentinel_only"
+    | "organization_only"
+    | "organization_and_sentinel"
+    | "hospital_and_sentinel"
+    | "hospital_clinic_sentinel";
+  default_programme: "diabetic_screening" | "ocular_diagnostics";
+  subscription_tier:
+    | "pilot"
+    | "clinic_core"
+    | "managed_review"
+    | "hybrid"
+    | "enterprise";
+  ai_enabled: boolean;
+  clinic_direct_screening_enabled: boolean;
+  ocular_diagnostics_enabled: boolean;
+  feature_flags: Record<string, unknown>;
+  settings_notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function fetchMyOrganizationCapabilities() {
+  const res = await fetch(
+    `${API_URL}/organizations/me/capabilities/`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to load organization capabilities."
+      )
+    );
+  }
+
+  return data as OrganizationCapabilityProfile;
+}
+
+export async function updateOpsClinicCapabilities(
+  clinicId: string | number,
+  data: Partial<OrganizationCapabilityProfile>
+) {
+  const res = await fetch(
+    `${API_URL}/ops/clinics/${clinicId}/`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify(data),
+    }
+  );
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        responseData,
+        "Failed to update clinic capabilities."
+      )
+    );
+  }
+
+  return responseData;
+}
