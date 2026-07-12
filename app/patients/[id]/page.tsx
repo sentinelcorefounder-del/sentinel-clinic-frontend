@@ -218,10 +218,10 @@ export default function PatientDetailPage() {
         </div>
 
         <Link
-          href={`/encounters/new?patientId=${patient.id}`}
+          href={`/retinal-assessments/new?patientId=${patient.id}`}
           className="sentinel-primary-button"
         >
-          Create Encounter
+          New Retinal Assessment
         </Link>
       </div>
 

@@ -311,9 +311,9 @@ export default function EncounterDetailPage({ params }: Props) {
       <section className="rounded-lg border p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Encounter Detail</h1>
+            <h1 className="text-2xl font-bold">Retinal Assessment</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Technician capture and clinical reporting for an assigned patient encounter.
+              Technician capture and clinical reporting for this retinal assessment.
             </p>
           </div>
 
@@ -321,15 +321,15 @@ export default function EncounterDetailPage({ params }: Props) {
             <Link href={`/patients/${patient.id}`} className="rounded-lg border px-4 py-2">
               View Patient
             </Link>
-            <Link href="/encounters" className="rounded-lg border px-4 py-2">
-              Back to Encounters
+            <Link href="/retinal-assessments">
+              Back to Retinal Assessments
             </Link>
           </div>
         </div>
 
         <div className="space-y-2">
           <p>
-            <strong>Encounter ID:</strong> {encounter.encounter_id}
+            <strong>Assessment ID:</strong> {encounter.encounter_id}
           </p>
           <p>
             <strong>Patient:</strong>{" "}
