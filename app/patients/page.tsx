@@ -7,8 +7,7 @@ export default function PatientsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-950">Patients</h1>
           <p className="mt-1 text-sm text-slate-700">
-            Patient records are managed by Sentinel Ops. Clinics can view and work
-            on assigned patients here.
+            View hospital-referred patients and clinic-owned patients registered for direct diabetic retinal assessment.
           </p>
         </div>
       </div>

@@ -848,3 +848,13 @@ export async function updateOpsClinicCapabilities(
 
   return responseData;
 }
+
+
+export async function createClinicDirectPatient(data: any) {
+  const res = await fetch(`${API_URL}/patients/clinic-direct/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: JSON.stringify(data),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to create clinic-direct patient."));
+  return responseData;
+}

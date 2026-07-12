@@ -349,6 +349,10 @@ export default function EncounterDetailPage({ params }: Props) {
           <p>
             <strong>Consent Status:</strong> {patient.consent_status || "-"}
           </p>
+          <p><strong>Source:</strong> {displayValue(encounterAny.source_type)}</p>
+          <p><strong>Workflow:</strong> {displayValue(encounterAny.workflow_route)}</p>
+          <p><strong>Payment Responsibility:</strong> {displayValue(encounterAny.payment_responsibility)}</p>
+          {encounterAny.source_hospital_name ? <p><strong>Source Hospital:</strong> {encounterAny.source_hospital_name}</p> : null}
         </div>
       </section>
 

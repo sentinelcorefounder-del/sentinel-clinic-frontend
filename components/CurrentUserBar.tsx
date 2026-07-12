@@ -103,9 +103,14 @@ function ClinicNav({ user }: { user: CurrentUser }) {
       <Link href="/patients" className="hover:text-slate-950 hover:underline">
         Clinic Patients
       </Link>
+      <Link href="/retinal-assessments" className="hover:text-slate-950 hover:underline">
+        Retinal Assessments
+      </Link>
+      {/*
       <Link href="/encounters" className="hover:text-slate-950 hover:underline">
         Encounters
       </Link>
+      */}
       <Link href="/reports" className="hover:text-slate-950 hover:underline">
         Reports
       </Link>

@@ -75,26 +75,26 @@ export default function DashboardPage() {
             Patients
           </Link>
           <Link
-            href="/encounters"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+            href="/retinal-assessments"
+            className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold"
           >
-            Encounters
+            Retinal Assessments
           </Link>
         </div>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StatCard title="Total Patients" value={summary.total_patients} />
-        <StatCard title="Total Encounters" value={summary.total_encounters} />
+        <StatCard title="Total Retinal Assessments" value={summary.total_encounters} />
         <StatCard title="Total Uploads" value={summary.total_uploads} />
         <StatCard title="Total Reports" value={summary.total_reports} />
         <StatCard title="Total Consents" value={summary.total_consents} />
         <StatCard
-          title="Encounters Pending Review"
+          title="Assessments Pending Review"
           value={summary.encounters_pending_review}
         />
         <StatCard
-          title="Completed Encounters"
+          title="Completed Assessments"
           value={summary.completed_encounters}
         />
       </section>
