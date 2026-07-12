@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { fetchHospitalDashboardSummary } from "@/lib/api";
 
 type HospitalDashboardSummary = {
+  total_patients: number;
   total_referrals: number;
   submitted: number;
   clinic_matched: number;
@@ -18,14 +19,33 @@ type HospitalDashboardSummary = {
 function StatCard({
   title,
   value,
+  href,
 }: {
   title: string;
   value: number;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+  const content = (
+    <>
       <p className="mb-2 text-sm font-medium text-slate-700">{title}</p>
       <p className="text-3xl font-bold text-slate-950">{value}</p>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      {content}
     </div>
   );
 }
@@ -96,6 +116,11 @@ export default function HospitalDashboardPage() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Patients"
+          value={summary.total_patients}
+          href="/hospital/patients"
+        />
         <StatCard title="Total Referrals" value={summary.total_referrals} />
         <StatCard title="Submitted" value={summary.submitted} />
         <StatCard title="Clinic Matched" value={summary.clinic_matched} />

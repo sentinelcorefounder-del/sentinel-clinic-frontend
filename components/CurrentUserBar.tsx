@@ -128,6 +128,9 @@ function HospitalNav() {
       <Link href="/hospital" className="hover:text-slate-950 hover:underline">
         Hospital Dashboard
       </Link>
+      <Link href="/hospital/patients" className="hover:text-slate-950 hover:underline">
+        Patients
+      </Link>
       <Link href="/hospital/referrals/new" className="hover:text-slate-950 hover:underline">
         New Referral
       </Link>

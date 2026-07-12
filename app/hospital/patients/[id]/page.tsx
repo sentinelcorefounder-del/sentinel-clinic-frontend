@@ -4,62 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  fetchPatientById,
-  fetchPatientConsents,
-  fetchPatientEncounters,
-  fetchPatientReports,
-  fetchPatientUploads,
+  fetchHospitalPatientById,
   fetchPatientTimeline,
-  getReportPdfUrl,
+  type PatientTimelineEvent,
 } from "@/lib/api";
-import type { ImageUpload } from "@/types/upload";
 import PatientTimeline from "@/components/PatientTimeline";
-import type { PatientTimelineEvent } from "@/lib/api";
 
-type Patient = {
-  id: number;
-  patient_id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth?: string;
-  sex?: string;
-  phone?: string;
-  email?: string;
-  consent_status?: string;
-  assigned_clinic?: number | null;
-  referral_id?: string;
-};
-
-type Encounter = {
-  id: number;
-  encounter_id: string;
-  encounter_date: string;
-  screening_status: string;
-  encounter_type: string;
-};
-
-type Report = {
-  id: number;
-  report_id: string;
-  review_date: string;
-  report_status: string;
-  left_dr_grade?: string;
-  right_dr_grade?: string;
-  left_maculopathy_grade?: string;
-  right_maculopathy_grade?: string;
-  urgency_outcome?: string;
-};
-
-type Consent = {
-  id: number;
-  consent_id: string;
-  consent_type: string;
-  consent_status: string;
-  consent_date: string;
-};
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+function pretty(value?: string | null) {
+  if (!value) return "-";
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 function formatDate(value?: string) {
   if (!value) return "-";
@@ -68,29 +24,14 @@ function formatDate(value?: string) {
   return date.toLocaleDateString();
 }
 
-function pretty(value?: string | null) {
-  if (!value) return "-";
-  return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function resolveFileUrl(fileUrl?: string | null) {
-  if (!fileUrl) return "";
-  return fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl}`;
-}
-
-export default function PatientDetailPage() {
+export default function HospitalPatientDetailPage() {
   const params = useParams();
   const id = String(params.id);
 
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [encounters, setEncounters] = useState<Encounter[]>([]);
-  const [reports, setReports] = useState<Report[]>([]);
-  const [consents, setConsents] = useState<Consent[]>([]);
-  const [uploads, setUploads] = useState<ImageUpload[]>([]);
+  const [data, setData] = useState<any>(null);
   const [timeline, setTimeline] = useState<PatientTimelineEvent[]>([]);
-  const [selectedUploadIds, setSelectedUploadIds] = useState<number[]>([]);
+  const [selectedImages, setSelectedImages] = useState<number[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerUploads, setViewerUploads] = useState<ImageUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -100,25 +41,19 @@ export default function PatientDetailPage() {
         setLoading(true);
         setError("");
 
-        const [patientData, encounterData, reportData, consentData, uploadData, timelineData] =
-          await Promise.all([
-            fetchPatientById(id),
-            fetchPatientEncounters(id),
-            fetchPatientReports(id),
-            fetchPatientConsents(id),
-            fetchPatientUploads(id),
-            fetchPatientTimeline(id, "hospital"),
-          ]);
+        const [patientData, timelineData] = await Promise.all([
+          fetchHospitalPatientById(id),
+          fetchPatientTimeline(id, "hospital"),
+        ]);
 
-        setPatient(patientData);
-        setEncounters(encounterData);
-        setReports(reportData);
-        setConsents(consentData);
-        setUploads(uploadData);
+        setData(patientData);
         setTimeline(timelineData.events || []);
       } catch (err) {
-        console.error(err);
-        setError(err instanceof Error ? err.message : "Failed to load patient details.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load hospital patient."
+        );
       } finally {
         setLoading(false);
       }
@@ -127,106 +62,103 @@ export default function PatientDetailPage() {
     load();
   }, [id]);
 
-  const groupedUploads = useMemo(() => {
-    return uploads.reduce<Record<string, ImageUpload[]>>((acc, upload) => {
-      const dateKey = formatDate(upload.uploaded_at);
-      acc[dateKey] = acc[dateKey] || [];
-      acc[dateKey].push(upload);
-      return acc;
-    }, {});
-  }, [uploads]);
+  const chosenImages = useMemo(
+    () =>
+      (data?.uploads || []).filter((image: any) =>
+        selectedImages.includes(image.id)
+      ),
+    [data, selectedImages]
+  );
 
-  function toggleSelected(uploadId: number) {
-    setSelectedUploadIds((current) =>
-      current.includes(uploadId)
-        ? current.filter((id) => id !== uploadId)
-        : [...current, uploadId]
+  function toggleImage(imageId: number) {
+    setSelectedImages((current) =>
+      current.includes(imageId)
+        ? current.filter((id) => id !== imageId)
+        : [...current, imageId]
     );
   }
 
-  function openViewerFromUpload(upload: ImageUpload) {
-    const selected = uploads.filter((item) => selectedUploadIds.includes(item.id));
-
-    if (selected.length > 0 && selectedUploadIds.includes(upload.id)) {
-      setViewerUploads(selected);
-    } else {
-      setViewerUploads([upload]);
-    }
-
-    setViewerOpen(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  if (loading) {
+    return <main className="p-10">Loading patient...</main>;
   }
 
-  function clearSelection() {
-    setSelectedUploadIds([]);
+  if (error || !data?.patient) {
+    return (
+      <main className="p-10 text-red-700">
+        {error || "Patient not found."}
+      </main>
+    );
   }
 
-  if (loading) return <main className="p-10">Loading patient...</main>;
-  if (error) return <main className="p-10 text-red-600">{error}</main>;
-  if (!patient) return <main className="p-10">Patient not found.</main>;
+  const patient = data.patient;
+  const referrals = data.referrals || [];
+  const encounters = data.encounters || [];
+  const reports = data.reports || [];
+  const uploads = data.uploads || [];
 
   return (
     <main className="sentinel-page space-y-8">
-      {viewerOpen && (
-        <section className="fixed inset-x-4 top-4 z-50 max-h-[92vh] overflow-auto rounded-2xl border bg-white p-4 shadow-2xl">
-          <div className="mb-4 flex items-center justify-between gap-4">
+      {viewerOpen && chosenImages.length ? (
+        <section className="fixed inset-4 z-50 overflow-auto rounded-2xl border bg-white p-5 shadow-2xl">
+          <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold">Selected Patient Images</h2>
-              <p className="text-sm text-gray-600">
-                {viewerUploads.length} image{viewerUploads.length === 1 ? "" : "s"} selected for review.
+              <h2 className="text-xl font-bold">Selected Fundus Images</h2>
+              <p className="text-sm text-slate-600">
+                {chosenImages.length} image
+                {chosenImages.length === 1 ? "" : "s"}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setViewerOpen(false)}
-              className="rounded-full border px-4 py-2 text-sm font-semibold hover:bg-gray-100"
-              aria-label="Close image viewer"
+              className="rounded-xl border px-4 py-2 font-semibold"
             >
-              ✕ Close
+              Close
             </button>
           </div>
 
-          <div className={`grid gap-4 ${viewerUploads.length === 1 ? "grid-cols-1" : "md:grid-cols-2"}`}>
-            {viewerUploads.map((upload) => (
-              <div key={upload.id} className="rounded-xl border bg-gray-50 p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="font-semibold">{pretty(upload.eye_laterality)} Eye</span>
-                  <span>{formatDate(upload.uploaded_at)}</span>
-                </div>
+          <div
+            className={`grid gap-4 ${
+              chosenImages.length === 1 ? "grid-cols-1" : "md:grid-cols-2"
+            }`}
+          >
+            {chosenImages.map((image: any) => (
+              <div key={image.id} className="rounded-xl border bg-slate-50 p-3">
                 <img
-                  src={resolveFileUrl(upload.image_file)}
-                  alt={`${upload.eye_laterality} eye retinal image`}
-                  className="max-h-[72vh] w-full rounded-lg object-contain"
+                  src={image.image_file}
+                  alt={`${image.eye_laterality} eye fundus`}
+                  className="max-h-[75vh] w-full rounded object-contain"
                 />
-                <div className="mt-2 text-xs text-gray-600">
-                  <p>Image ID: {upload.image_upload_id}</p>
-                  <p>Encounter: {upload.encounter_display || upload.encounter}</p>
-                  <p>Quality: {pretty(upload.image_quality)}</p>
-                </div>
+                <p className="mt-2 text-sm font-semibold">
+                  {pretty(image.eye_laterality)} Eye
+                </p>
+                <p className="text-xs text-slate-600">
+                  Encounter: {image.encounter_display}
+                </p>
               </div>
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">
             {patient.first_name} {patient.last_name}
           </h1>
-          <p className="text-sm text-gray-600">{patient.patient_id}</p>
+          <p className="text-sm text-slate-600">{patient.patient_id}</p>
         </div>
 
         <Link
-          href={`/encounters/new?patientId=${patient.id}`}
-          className="sentinel-primary-button"
+          href="/hospital/patients"
+          className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold"
         >
-          Create Encounter
+          Back to Patients
         </Link>
       </div>
 
       <section className="sentinel-card grid gap-4 p-6 md:grid-cols-3">
-        <Info label="DOB" value={patient.date_of_birth || "-"} />
+        <Info label="Date of birth" value={formatDate(patient.date_of_birth)} />
         <Info label="Sex" value={pretty(patient.sex)} />
         <Info label="Phone" value={patient.phone || "-"} />
         <Info label="Email" value={patient.email || "-"} />
@@ -236,96 +168,136 @@ export default function PatientDetailPage() {
 
       <PatientTimeline events={timeline} />
 
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold">Patient Image Timeline</h2>
-            <p className="text-sm text-gray-600">
-              Select any images, then double-click one selected image to open them together at the top of the page.
-            </p>
-          </div>
-
-          {selectedUploadIds.length > 0 && (
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="sentinel-secondary-button text-sm"
-            >
-              Clear selection ({selectedUploadIds.length})
-            </button>
-          )}
-        </div>
-
-        {uploads.length === 0 ? (
-          <div className="sentinel-card p-5 text-sm text-slate-600">
-            No images uploaded for this patient yet.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {Object.entries(groupedUploads).map(([date, items]) => (
-              <div key={date} className="sentinel-card p-5">
-                <h3 className="mb-3 font-semibold">{date}</h3>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {items.map((upload) => (
-                    <ImageCard
-                      key={upload.id}
-                      upload={upload}
-                      selected={selectedUploadIds.includes(upload.id)}
-                      onToggle={() => toggleSelected(upload.id)}
-                      onDoubleClick={() => openViewerFromUpload(upload)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-3">
-        <HistoryTable
-          title="Encounters"
-          rows={encounters.map((encounter) => [
-            encounter.encounter_date,
-            <Link
-              key={`encounter-${encounter.id}`}
-              href={`/encounters/${encounter.id}`}
-              className="font-semibold text-blue-700 underline"
-            >
-              {encounter.encounter_id}
-            </Link>,
-            pretty(encounter.screening_status),
-            pretty(encounter.encounter_type),
+      <section className="sentinel-card p-6">
+        <h2 className="mb-4 text-xl font-semibold">Referrals</h2>
+        <SimpleTable
+          headers={[
+            "Referral",
+            "Hospital MRN",
+            "Clinic",
+            "Status",
+            "Payment",
+            "Report",
+          ]}
+          rows={referrals.map((referral: any) => [
+            referral.referral_id,
+            referral.hospital_mrn || "-",
+            referral.clinic_name || "Not assigned",
+            pretty(referral.referral_status),
+            pretty(referral.payment_status),
+            pretty(referral.report_status),
           ])}
         />
+      </section>
 
-        <HistoryTable
-          title="Reports"
-          rows={reports.map((report) => [
-            report.review_date,
+      <section className="sentinel-card p-6">
+        <h2 className="mb-4 text-xl font-semibold">Issued Reports</h2>
+        <SimpleTable
+          headers={[
+            "Report",
+            "Review Date",
+            "Status",
+            "Outcome",
+            "Issued",
+            "PDF",
+          ]}
+          rows={reports.map((report: any) => [
+            report.report_id,
+            formatDate(report.review_date),
+            pretty(report.report_status),
+            pretty(report.urgency_outcome),
+            formatDate(report.issued_at),
             <a
-              key={`report-${report.id}`}
-              href={getReportPdfUrl(report.id)}
+              key={`pdf-${report.id}`}
+              href={report.pdf_url}
               target="_blank"
               rel="noreferrer"
               className="font-semibold text-blue-700 underline"
             >
-              {report.report_id}
+              View PDF
             </a>,
-            `R: ${pretty(report.right_dr_grade)} / L: ${pretty(report.left_dr_grade)}`,
-            pretty(report.report_status),
           ])}
         />
+      </section>
 
-        <HistoryTable
-          title="Consents"
-          rows={consents.map((consent) => [
-            consent.consent_date,
-            pretty(consent.consent_type),
-            pretty(consent.consent_status),
-            consent.consent_id,
+      <section className="sentinel-card p-6">
+        <h2 className="mb-4 text-xl font-semibold">Encounters</h2>
+        <SimpleTable
+          headers={["Encounter", "Date", "Type", "Status"]}
+          rows={encounters.map((encounter: any) => [
+            encounter.encounter_id,
+            formatDate(encounter.encounter_date),
+            pretty(encounter.encounter_type),
+            pretty(encounter.screening_status),
           ])}
         />
+      </section>
+
+      <section className="sentinel-card p-6">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">Fundus Images</h2>
+            <p className="text-sm text-slate-600">
+              Images are available only from reports issued to your hospital.
+            </p>
+          </div>
+
+          {selectedImages.length ? (
+            <button
+              type="button"
+              onClick={() => setViewerOpen(true)}
+              className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Open Selected ({selectedImages.length})
+            </button>
+          ) : null}
+        </div>
+
+        {!uploads.length ? (
+          <p className="text-sm text-slate-500">
+            No issued-report images are available.
+          </p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {uploads.map((image: any) => {
+              const selected = selectedImages.includes(image.id);
+
+              return (
+                <article
+                  key={image.id}
+                  className={`overflow-hidden rounded-xl border bg-white ${
+                    selected ? "ring-2 ring-slate-950" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleImage(image.id)}
+                    className="block w-full text-left"
+                  >
+                    <img
+                      src={image.image_file}
+                      alt={`${image.eye_laterality} eye fundus`}
+                      className="h-56 w-full object-cover"
+                    />
+                    <div className="space-y-1 p-3 text-sm">
+                      <p className="font-semibold">
+                        {pretty(image.eye_laterality)} Eye
+                      </p>
+                      <p>Encounter: {image.encounter_display}</p>
+                      <p>Quality: {pretty(image.image_quality)}</p>
+                      <p>Uploaded: {formatDate(image.uploaded_at)}</p>
+                      {image.ai_analysis ? (
+                        <p className="text-blue-700">
+                          AI: {pretty(image.ai_analysis.prediction)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
     </main>
   );
@@ -334,102 +306,49 @@ export default function PatientDetailPage() {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="font-medium">{value}</p>
+      <p className="text-xs uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="font-medium text-slate-950">{value}</p>
     </div>
   );
 }
 
-function ImageCard({
-  upload,
-  selected,
-  onToggle,
-  onDoubleClick,
-}: {
-  upload: ImageUpload;
-  selected: boolean;
-  onToggle: () => void;
-  onDoubleClick: () => void;
-}) {
-  return (
-    <div
-      onDoubleClick={onDoubleClick}
-      className={`overflow-hidden rounded-lg border bg-white transition ${
-        selected ? "ring-2 ring-black" : "hover:shadow"
-      }`}
-      title="Click to select. Double-click to open selected images."
-    >
-      <div className="flex items-center gap-2 border-b bg-gray-50 p-2">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggle}
-          onClick={(event) => event.stopPropagation()}
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-left text-sm font-semibold"
-        >
-          {pretty(upload.eye_laterality)} Eye — {formatDate(upload.uploaded_at)}
-        </button>
-      </div>
-
-      <button type="button" onClick={onToggle} className="block w-full">
-        <img
-          src={resolveFileUrl(upload.image_file)}
-          alt={`${upload.eye_laterality} eye image`}
-          className="h-56 w-full object-cover"
-        />
-      </button>
-
-      <div className="space-y-1 p-3 text-sm">
-        <p>Image ID: {upload.image_upload_id}</p>
-        <p>Encounter: {upload.encounter_display || upload.encounter}</p>
-        <p>Quality: {pretty(upload.image_quality)}</p>
-        {upload.ai_analysis ? (
-          <p className="text-blue-700">
-            AI: {pretty(upload.ai_analysis.prediction)}{" "}
-            {upload.ai_analysis.confidence !== null && upload.ai_analysis.confidence !== undefined
-              ? `(${Number(upload.ai_analysis.confidence).toFixed(2)})`
-              : ""}
-          </p>
-        ) : (
-          <p className="text-amber-700">AI pending/not shown</p>
-        )}
-        {upload.dataset_label ? (
-          <p className="text-emerald-700">Dataset: {upload.dataset_label.label_id}</p>
-        ) : (
-          <p className="text-amber-700">Dataset pending / AI consent not granted</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function HistoryTable({
-  title,
+function SimpleTable({
+  headers,
   rows,
 }: {
-  title: string;
+  headers: string[];
   rows: React.ReactNode[][];
 }) {
+  if (!rows.length) {
+    return <p className="text-sm text-slate-500">No records found.</p>;
+  }
+
   return (
-    <div className="sentinel-card p-5">
-      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
-      {rows.length === 0 ? (
-        <p className="text-sm text-gray-500">No records yet.</p>
-      ) : (
-        <div className="space-y-2 text-sm">
-          {rows.map((row, index) => (
-            <div key={index} className="rounded border bg-gray-50 p-2">
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-slate-100">
+          <tr>
+            {headers.map((header) => (
+              <th key={header} className="p-3">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-t">
               {row.map((cell, cellIndex) => (
-                <div key={cellIndex}>{cell}</div>
+                <td key={cellIndex} className="p-3">
+                  {cell}
+                </td>
               ))}
-            </div>
+            </tr>
           ))}
-        </div>
-      )}
+        </tbody>
+      </table>
     </div>
   );
 }

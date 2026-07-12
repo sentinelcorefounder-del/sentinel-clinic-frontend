@@ -670,3 +670,78 @@ export async function fetchPatientTimeline(
   }
   return data;
 }
+
+
+export type HospitalPatientListItem = {
+  patient_pk: number;
+  patient_id: string;
+  patient_name: string;
+  date_of_birth?: string;
+  sex?: string;
+  phone?: string;
+  email?: string;
+  hospital_mrn: string;
+  referral_pk: number;
+  referral_id: string;
+  referral_status: string;
+  clinic_name: string;
+  payment_status: string;
+  report_pk?: number | null;
+  report_id: string;
+  report_status: string;
+  report_ready: boolean;
+  latest_activity: string;
+};
+
+export async function fetchHospitalPatients(params?: {
+  search?: string;
+  status?: string;
+}) {
+  const query = new URLSearchParams();
+
+  if (params?.search) query.set("search", params.search);
+  if (params?.status && params.status !== "all") {
+    query.set("status", params.status);
+  }
+
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const res = await fetch(
+    `${API_URL}/referrals/hospital/patients/${suffix}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => []);
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to load hospital patients.")
+    );
+  }
+
+  return data as HospitalPatientListItem[];
+}
+
+export async function fetchHospitalPatientById(
+  patientId: string | number
+) {
+  const res = await fetch(
+    `${API_URL}/referrals/hospital/patients/${patientId}/`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to load hospital patient.")
+    );
+  }
+
+  return data;
+}
