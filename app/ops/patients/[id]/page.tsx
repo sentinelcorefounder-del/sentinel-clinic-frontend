@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { serverFetch } from "@/lib/server-api";
+import PatientTimeline from "@/components/PatientTimeline";
 
 export default async function OpsPatientDetailPage({
   params,
@@ -7,7 +8,10 @@ export default async function OpsPatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const data = await serverFetch(`/api/ops/patients/${id}/`);
+  const [data, timelineData] = await Promise.all([
+    serverFetch(`/api/ops/patients/${id}/`),
+    serverFetch(`/api/audit/patients/${id}/timeline/?portal=ops`),
+  ]);
 
   const patient = data.patient;
   const referrals = data.referrals || [];
@@ -46,6 +50,8 @@ export default async function OpsPatientDetailPage({
           <p>Images: {uploads.length}</p>
         </Box>
       </div>
+
+      <PatientTimeline events={timelineData.events || []} />
 
       <Section title="Referrals">
         <Table

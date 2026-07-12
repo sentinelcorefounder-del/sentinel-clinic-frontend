@@ -632,3 +632,41 @@ export async function fetchHospitalReportById(id: string | number) {
   if (!res.ok) throw new Error(formatApiError(data, "Failed to load hospital report."));
   return data;
 }
+
+
+export type PatientTimelineEvent = {
+  id: number;
+  category: string;
+  event_type: string;
+  title: string;
+  description: string;
+  source_type: string;
+  source_id: string;
+  encounter_id: string;
+  report_id: string;
+  referral_id: string;
+  payment_id: string;
+  actor_display: string;
+  organization_display: string;
+  visibility: string;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+};
+
+export async function fetchPatientTimeline(
+  patientId: string | number,
+  portal: "clinic" | "ops" | "hospital" = "clinic"
+) {
+  const res = await fetch(
+    `${API_URL}/audit/patients/${patientId}/timeline/?portal=${portal}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(data, "Failed to load patient timeline."));
+  }
+  return data;
+}

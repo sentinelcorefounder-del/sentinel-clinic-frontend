@@ -9,9 +9,12 @@ import {
   fetchPatientEncounters,
   fetchPatientReports,
   fetchPatientUploads,
+  fetchPatientTimeline,
   getReportPdfUrl,
 } from "@/lib/api";
 import type { ImageUpload } from "@/types/upload";
+import PatientTimeline from "@/components/PatientTimeline";
+import type { PatientTimelineEvent } from "@/lib/api";
 
 type Patient = {
   id: number;
@@ -84,6 +87,7 @@ export default function PatientDetailPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [consents, setConsents] = useState<Consent[]>([]);
   const [uploads, setUploads] = useState<ImageUpload[]>([]);
+  const [timeline, setTimeline] = useState<PatientTimelineEvent[]>([]);
   const [selectedUploadIds, setSelectedUploadIds] = useState<number[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerUploads, setViewerUploads] = useState<ImageUpload[]>([]);
@@ -96,13 +100,14 @@ export default function PatientDetailPage() {
         setLoading(true);
         setError("");
 
-        const [patientData, encounterData, reportData, consentData, uploadData] =
+        const [patientData, encounterData, reportData, consentData, uploadData, timelineData] =
           await Promise.all([
             fetchPatientById(id),
             fetchPatientEncounters(id),
             fetchPatientReports(id),
             fetchPatientConsents(id),
             fetchPatientUploads(id),
+            fetchPatientTimeline(id, "clinic"),
           ]);
 
         setPatient(patientData);
@@ -110,6 +115,7 @@ export default function PatientDetailPage() {
         setReports(reportData);
         setConsents(consentData);
         setUploads(uploadData);
+        setTimeline(timelineData.events || []);
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : "Failed to load patient details.");
@@ -227,6 +233,8 @@ export default function PatientDetailPage() {
         <Info label="Consent" value={pretty(patient.consent_status)} />
         <Info label="Referral ID" value={patient.referral_id || "-"} />
       </section>
+
+      <PatientTimeline events={timeline} />
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
