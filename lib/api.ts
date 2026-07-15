@@ -573,15 +573,44 @@ export async function returnOpsReport(reportId: string | number, reason: string)
   return data;
 }
 
-export async function approveAndIssueOpsReport(reportId: string | number, note = "") {
-  const res = await fetch(`${API_URL}/ops/reports/${reportId}/approve/`, {
-    method: "POST",
-    credentials: "include",
-    headers: await getCsrfHeaders(true),
-    body: JSON.stringify({ note }),
-  });
+export type OpsReportSignature = {
+  signer_name: string;
+  signer_role: string;
+  signer_registration_number: string;
+};
+
+export async function approveAndIssueOpsReport(
+  reportId: string | number,
+  note: string,
+  signature: OpsReportSignature
+) {
+  const res = await fetch(
+    `${API_URL}/ops/reports/${reportId}/approve/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({
+        note,
+        signer_name: signature.signer_name,
+        signer_role: signature.signer_role,
+        signer_registration_number:
+          signature.signer_registration_number,
+      }),
+    }
+  );
+
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(data, "Failed to issue report."));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to approve, sign and issue report."
+      )
+    );
+  }
+
   return data;
 }
 
@@ -857,4 +886,12 @@ export async function createClinicDirectPatient(data: any) {
   const responseData = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatApiError(responseData, "Failed to create clinic-direct patient."));
   return responseData;
+}
+
+
+export async function clinicIssueReport(reportId: string | number, signature: { signer_name: string; signer_role: string; signer_registration_number: string; }) {
+  const res = await fetch(`${API_URL}/reports/${reportId}/clinic-issue/`, { method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: JSON.stringify(signature) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to sign and issue report."));
+  return data;
 }

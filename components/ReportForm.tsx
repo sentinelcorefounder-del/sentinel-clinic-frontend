@@ -6,6 +6,7 @@ import {
   createReport,
   getReportPdfUrl,
   submitReportToOps,
+  clinicIssueReport,
   updateReport,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
@@ -15,6 +16,7 @@ type Props = {
   encounterId: number;
   patientId: number;
   patientConsentStatus: string;
+  workflowRoute: "clinic_managed" | "sentinel_managed";
   existingReport?: StructuredReport | null;
   encounter?: {
     left_unaided_va?: string;
@@ -75,6 +77,7 @@ export default function ReportForm({
   encounterId,
   patientId,
   patientConsentStatus,
+  workflowRoute,
   existingReport,
   encounter,
   onReportSaved,
@@ -86,6 +89,8 @@ export default function ReportForm({
   const [formData, setFormData] = useState(blankForm(encounterId, patientId, encounter));
   const [loading, setLoading] = useState(false);
   const [submittingToOps, setSubmittingToOps] = useState(false);
+  const [issuingDirectly, setIssuingDirectly] = useState(false);
+  const [signature, setSignature] = useState({ signer_name: "", signer_role: "", signer_registration_number: "" });
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
 
@@ -119,6 +124,13 @@ export default function ReportForm({
         recommendation: existingReport.recommendation || "",
         next_followup_interval: existingReport.next_followup_interval || "",
         notes: existingReport.notes || "",
+      });
+
+      setSignature({
+        signer_name: existingReport.signer_name || "",
+        signer_role: existingReport.signer_role || "",
+        signer_registration_number:
+          existingReport.signer_registration_number || "",
       });
     } else {
       setFormData(blankForm(encounterId, patientId, encounter));
@@ -169,8 +181,23 @@ export default function ReportForm({
       setMessage("");
       const payload = {
         ...formData,
-        dr_grade: formData.right_dr_grade || formData.left_dr_grade || formData.dr_grade || "",
-        maculopathy_grade: formData.right_maculopathy_grade || formData.left_maculopathy_grade || formData.maculopathy_grade || "",
+
+        dr_grade:
+          formData.right_dr_grade ||
+          formData.left_dr_grade ||
+          formData.dr_grade ||
+          "",
+
+        maculopathy_grade:
+          formData.right_maculopathy_grade ||
+          formData.left_maculopathy_grade ||
+          formData.maculopathy_grade ||
+          "",
+
+        signer_name: signature.signer_name,
+        signer_role: signature.signer_role,
+        signer_registration_number:
+          signature.signer_registration_number,
       };
       const saved = isExisting
         ? await updateReport(report!.id, payload)
@@ -206,6 +233,76 @@ export default function ReportForm({
       setMessage(error instanceof Error ? error.message : "Failed to submit report to Ops.");
     } finally {
       setSubmittingToOps(false);
+    }
+  }
+
+    async function handleClinicIssue() {
+    if (!report?.id) {
+      setMessageType("error");
+      setMessage("Save the report draft before issuing it.");
+      return;
+    }
+
+    if (
+      !signature.signer_name.trim() ||
+      !signature.signer_role.trim() ||
+      !signature.signer_registration_number.trim()
+    ) {
+      setMessageType("error");
+      setMessage(
+        "Clinician name, professional role and registration number are required before issue."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      [
+        "Sign and issue this report?",
+        "",
+        "After issue:",
+        "• The report will become read-only.",
+        "• The electronic signature will be permanently recorded.",
+        "• Sentinel will retain a read-only audit copy.",
+        "",
+        "Continue?",
+      ].join("\n")
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIssuingDirectly(true);
+      setMessage("");
+
+      const response = await clinicIssueReport(
+        report.id,
+        signature
+      );
+
+      setReport(
+        response.report || {
+          ...report,
+          report_status: "issued",
+        }
+      );
+
+      setMessageType("success");
+      setMessage(
+        "Report signed and issued successfully. The report is now read-only."
+      );
+
+      await refresh();
+    } catch (error) {
+      setMessageType("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to sign and issue report."
+      );
+    } finally {
+      setIssuingDirectly(false);
     }
   }
 
@@ -261,7 +358,26 @@ export default function ReportForm({
         <textarea name="recommendation" value={formData.recommendation} onChange={handleChange} placeholder="Recommendation" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
         <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Notes" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
 
+        {report?.id && workflowRoute === "clinic_managed" && canSubmit ? (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h3 className="font-semibold text-blue-950">Electronic Clinician Signature</h3>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <input value={signature.signer_name} onChange={(e)=>setSignature({...signature, signer_name:e.target.value})} placeholder="Clinician full name" className="rounded border bg-white p-3" />
+              <input value={signature.signer_role} onChange={(e)=>setSignature({...signature, signer_role:e.target.value})} placeholder="Professional role" className="rounded border bg-white p-3" />
+              <input value={signature.signer_registration_number} onChange={(e)=>setSignature({...signature, signer_registration_number:e.target.value})} placeholder="Registration number" className="rounded border bg-white p-3" />
+            </div>
+          </div>
+        ) : null}
+
         {message ? <div className={`rounded-lg border p-3 text-sm font-medium ${messageType === "error" ? "border-red-200 bg-red-50 text-red-800" : messageType === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>{message}</div> : null}
+
+        {report?.report_status === "issued" && report?.signed_at ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <p className="font-semibold">Electronically Signed and Issued</p>
+            <p>{report.signer_name || report.signed_by_display || "-"}{report.signer_role ? ` · ${report.signer_role}` : ""}{report.signer_registration_number ? ` · ${report.signer_registration_number}` : ""}</p>
+            <p>{report.signed_at}</p>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-3">
           {isEditable ? (
@@ -271,14 +387,44 @@ export default function ReportForm({
           ) : null}
 
           {report?.id ? (
-            <button type="button" onClick={() => window.open(getReportPdfUrl(report.id), "_blank", "noopener,noreferrer")} className="rounded-lg bg-blue-600 px-4 py-3 text-white">
-              Generate PDF
-            </button>
+          <button
+            type="button"
+            onClick={() =>
+              window.open(
+                getReportPdfUrl(report.id),
+                "_blank",
+                "noopener,noreferrer"
+              )
+            }
+            className="rounded-lg border border-blue-600 bg-white px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
+          >
+            {report.report_status === "issued"
+              ? "Open Final PDF"
+              : "Preview Draft PDF"}
+          </button>
           ) : null}
 
-          {canSubmit ? (
+          {canSubmit && workflowRoute === "sentinel_managed" ? (
             <button type="button" onClick={handleSubmitToOps} disabled={submittingToOps} className="rounded-lg bg-emerald-600 px-4 py-3 text-white disabled:opacity-50">
-              {submittingToOps ? "Submitting..." : report?.report_status === "returned_to_clinic" || report?.report_status === "ops_rejected" ? "Resubmit to Ops" : "Submit to Ops"}
+              {submittingToOps ? "Submitting..." : report?.report_status === "returned_to_clinic" || report?.report_status === "ops_rejected" ? "Resubmit to Ops" : "Submit to Sentinel Ops"}
+            </button>
+          ) : null}
+          {canSubmit && workflowRoute === "clinic_managed" ? (
+            <button
+              type="button"
+              onClick={handleClinicIssue}
+              disabled={issuingDirectly}
+              style={{
+                backgroundColor: issuingDirectly ? "#6ee7b7" : "#047857",
+                color: "#ffffff",
+                border: "1px solid #065f46",
+                opacity: 1,
+              }}
+              className="rounded-lg px-5 py-3 font-semibold shadow-sm hover:brightness-90 disabled:cursor-not-allowed"
+            >
+              {issuingDirectly
+                ? "Signing and Issuing..."
+                : "Sign and Issue Report"}
             </button>
           ) : null}
         </div>

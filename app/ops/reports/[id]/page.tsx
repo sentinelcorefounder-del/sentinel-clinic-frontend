@@ -17,6 +17,11 @@ export default function OpsReportReviewPage({
   const [id, setId] = useState("");
   const [report, setReport] = useState<any>(null);
   const [note, setNote] = useState("");
+  const [signature, setSignature] = useState({
+    signer_name: "",
+    signer_role: "",
+    signer_registration_number: "",
+  });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -46,7 +51,34 @@ export default function OpsReportReviewPage({
       }
 
       if (kind === "issue") {
-        await approveAndIssueOpsReport(id, note);
+        if (
+          !signature.signer_name.trim() ||
+          !signature.signer_role.trim() ||
+          !signature.signer_registration_number.trim()
+        ) {
+          throw new Error(
+            "Clinician name, professional role and registration number are required."
+          );
+        }
+
+        const confirmed = window.confirm(
+          [
+            "Approve, sign and issue this report?",
+            "",
+            "After issue:",
+            "• The report will become read-only.",
+            "• The electronic signature will be permanently recorded.",
+            "• The final PDF will show the Sentinel reviewer's details.",
+            "",
+            "Continue?",
+          ].join("\n")
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        await approveAndIssueOpsReport(id, note, signature);
       }
 
       if (kind === "reject") {
@@ -55,6 +87,14 @@ export default function OpsReportReviewPage({
 
       await load(id);
       setNote("");
+
+      if (kind === "issue") {
+        setSignature({
+          signer_name: "",
+          signer_role: "",
+          signer_registration_number: "",
+        });
+      }
 
       setMessage(
         kind === "return"
@@ -81,6 +121,13 @@ export default function OpsReportReviewPage({
     report.report_status || ""
   );
 
+  const issueDisabled =
+    busy ||
+    !canIssue ||
+    !signature.signer_name.trim() ||
+    !signature.signer_role.trim() ||
+    !signature.signer_registration_number.trim();
+
   return (
     <main className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -95,7 +142,42 @@ export default function OpsReportReviewPage({
       </div>
 
       {message ? (
-        <div className="rounded border bg-white p-3 text-sm">{message}</div>
+        <div className="rounded border bg-white p-3 text-sm">
+          {message}
+        </div>
+      ) : null}
+
+      {report.report_status === "issued" ? (
+        <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-emerald-950 shadow-sm">
+          <h2 className="text-lg font-bold">
+            Report Issued by Sentinel
+          </h2>
+          <p className="mt-1 text-sm">
+            This report has been electronically signed and is now
+            read-only.
+          </p>
+
+          <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
+            <p>
+              <strong>Clinician:</strong>{" "}
+              {report.signer_name ||
+                report.signed_by_display ||
+                "-"}
+            </p>
+            <p>
+              <strong>Professional role:</strong>{" "}
+              {report.signer_role || "-"}
+            </p>
+            <p>
+              <strong>Registration number:</strong>{" "}
+              {report.signer_registration_number || "-"}
+            </p>
+            <p>
+              <strong>Issued:</strong>{" "}
+              {report.signed_at || report.issued_at || "-"}
+            </p>
+          </div>
+        </section>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -184,11 +266,69 @@ export default function OpsReportReviewPage({
       <section className="rounded-xl bg-white p-6 shadow">
         <h2 className="mb-4 text-xl font-bold">Review Action</h2>
 
-        {!canReview ? (
+        {!canReview && !canIssue ? (
           <div className="mb-4 rounded-lg border border-slate-300 bg-slate-100 p-3 text-sm text-slate-700">
             This report is currently{" "}
             <strong>{String(report.report_status).replaceAll("_", " ")}</strong>.
-            Review actions are available only while a report is submitted to Ops.
+            Review actions are no longer available.
+          </div>
+        ) : null}
+
+        {canIssue ? (
+          <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h3 className="font-semibold text-blue-950">
+              Clinical Sign-off
+            </h3>
+
+            <p className="mt-1 text-sm text-blue-900">
+              The Sentinel clinician reviewing this report must enter
+              their professional details before final issue.
+            </p>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <input
+                type="text"
+                value={signature.signer_name}
+                onChange={(event) =>
+                  setSignature((current) => ({
+                    ...current,
+                    signer_name: event.target.value,
+                  }))
+                }
+                placeholder="Clinician full name"
+                className="rounded border bg-white px-3 py-2"
+                disabled={busy}
+              />
+
+              <input
+                type="text"
+                value={signature.signer_role}
+                onChange={(event) =>
+                  setSignature((current) => ({
+                    ...current,
+                    signer_role: event.target.value,
+                  }))
+                }
+                placeholder="Professional role"
+                className="rounded border bg-white px-3 py-2"
+                disabled={busy}
+              />
+
+              <input
+                type="text"
+                value={signature.signer_registration_number}
+                onChange={(event) =>
+                  setSignature((current) => ({
+                    ...current,
+                    signer_registration_number:
+                      event.target.value,
+                  }))
+                }
+                placeholder="Registration number"
+                className="rounded border bg-white px-3 py-2"
+                disabled={busy}
+              />
+            </div>
           </div>
         ) : null}
 
@@ -198,6 +338,7 @@ export default function OpsReportReviewPage({
           rows={4}
           placeholder="Reviewer note or required correction"
           className="w-full rounded border px-3 py-2"
+          disabled={busy || (!canReview && !canIssue)}
         />
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3" style={{ display: "grid" }}>
@@ -241,7 +382,7 @@ export default function OpsReportReviewPage({
 
           <button
             type="button"
-            disabled={busy || !canIssue}
+            disabled={issueDisabled}
             onClick={() => act("issue")}
             style={{
               display: "block",
@@ -251,11 +392,11 @@ export default function OpsReportReviewPage({
               borderRadius: "8px",
               padding: "12px 18px",
               fontWeight: 700,
-              cursor: busy || !canIssue ? "not-allowed" : "pointer",
-              opacity: busy || !canIssue ? 0.45 : 1,
+              cursor: issueDisabled ? "not-allowed" : "pointer",
+              opacity: issueDisabled ? 0.45 : 1,
             }}
           >
-            Approve and Issue
+            {busy ? "Processing..." : "Approve, Sign and Issue"}
           </button>
         </div>
       </section>

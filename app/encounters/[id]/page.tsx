@@ -10,8 +10,6 @@ import {
   fetchEncounterConsents,
   fetchPatientById,
   updatePatient,
-  getReportPdfUrl,
-  submitReportToOps,
   deleteImageUpload,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
@@ -30,7 +28,6 @@ type Props = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
 const ALLOWED_DELETE_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
 
 function displayValue(value?: string | null) {
@@ -60,9 +57,7 @@ export default function EncounterDetailPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [reportActionMessage, setReportActionMessage] = useState("");
   const [uploadActionMessage, setUploadActionMessage] = useState("");
-  const [submittingReportId, setSubmittingReportId] = useState<number | null>(null);
   const [deletingUploadId, setDeletingUploadId] = useState<number | null>(null);
 
   const [measurementForm, setMeasurementForm] = useState({
@@ -215,22 +210,6 @@ export default function EncounterDetailPage({ params }: Props) {
     setEncounter(refreshedEncounter);
   }
 
-  async function handleSubmitExistingReportToOps(reportId: number) {
-    try {
-      setSubmittingReportId(reportId);
-      setReportActionMessage("");
-      await submitReportToOps(reportId);
-      await handleReportCreated();
-      setReportActionMessage("Report submitted to Ops successfully.");
-    } catch (err) {
-      setReportActionMessage(
-        err instanceof Error ? err.message : "Failed to submit report to Ops."
-      );
-    } finally {
-      setSubmittingReportId(null);
-    }
-  }
-
   function handleMeasurementChange(
     field: keyof typeof measurementForm,
     value: string
@@ -280,12 +259,7 @@ export default function EncounterDetailPage({ params }: Props) {
     }
   }
 
-  function canSubmitReport(reportStatus?: string) {
-    return ["draft", "under_review", "signed_off", "ops_rejected", "returned_to_clinic"].includes(reportStatus || "");
-  }
 
-
-  const canSubmitToOps = hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES);
   const canDeleteUploads = hasAnyRole(currentUser, ALLOWED_DELETE_UPLOAD_ROLES);
 
   const encounterAny: any = encounter;
@@ -731,6 +705,7 @@ export default function EncounterDetailPage({ params }: Props) {
           encounterId={encounter.id}
           patientId={encounter.patient}
           patientConsentStatus={patient.consent_status || "pending"}
+          workflowRoute={encounterAny.workflow_route || "sentinel_managed"}
           encounter={encounterAny}
           existingReport={reports[0] || null}
           onReportSaved={handleReportCreated}
@@ -739,10 +714,6 @@ export default function EncounterDetailPage({ params }: Props) {
 
       <section className="rounded-lg border p-6">
         <h2 className="mb-4 text-xl font-semibold">Structured Reports</h2>
-
-        {reportActionMessage ? (
-          <p className="mb-4 text-sm text-gray-700">{reportActionMessage}</p>
-        ) : null}
 
         {reports.length === 0 ? (
           <p>No reports created yet.</p>
@@ -797,7 +768,7 @@ export default function EncounterDetailPage({ params }: Props) {
                   </div>
 
                   <div className="rounded border bg-slate-50 p-3 text-sm">
-                    <p className="mb-2 font-semibold">Encounter VA Summary</p>
+                    <p className="mb-2 font-semibold">Assessment VA Summary</p>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
                         <p>
@@ -839,35 +810,6 @@ export default function EncounterDetailPage({ params }: Props) {
                       <strong>Notes:</strong> {report.notes || "-"}
                     </p>
                   </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.open(
-                        getReportPdfUrl(report.id),
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
-                    }
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                  >
-                    Generate PDF
-                  </button>
-
-                  {canSubmitToOps && canSubmitReport(report.report_status) ? (
-                    <button
-                      type="button"
-                      onClick={() => handleSubmitExistingReportToOps(report.id)}
-                      disabled={submittingReportId === report.id}
-                      className="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {submittingReportId === report.id
-                        ? "Submitting..."
-                        : "Submit to Ops"}
-                    </button>
-                  ) : null}
                 </div>
               </div>
             ))}

@@ -41,6 +41,18 @@ export type StructuredReport = {
   hospital_downloaded_at?: string | null;
 
   payout_email_sent_at?: string | null;
+  report_owner?: "clinic" | "sentinel";
+  workflow_route?: "clinic_managed" | "sentinel_managed";
+  source_type?: "clinic_direct" | "hospital_referral";
+  signed_by?: number | null;
+  signed_by_display?: string;
+  signed_at?: string | null;
+  signer_name?: string;
+  signer_role?: string;
+  signer_registration_number?: string;
+  issued_by?: number | null;
+  issued_by_display?: string;
+  sentinel_archive_received_at?: string | null;
 
   created_at: string;
   updated_at: string;
