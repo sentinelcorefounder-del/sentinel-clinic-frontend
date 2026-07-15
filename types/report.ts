@@ -1,3 +1,9 @@
+export type ReportFormat =
+  | "clinician"
+  | "patient"
+  | "hospital"
+  | "ops";
+
 export type StructuredReport = {
   id: number;
   report_id: string;

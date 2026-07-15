@@ -371,8 +371,19 @@ export async function submitReportToOps(reportId: string | number) {
   return responseData;
 }
 
-export function getReportPdfUrl(reportId: string | number) {
-  return `${API_URL}/reports/${reportId}/pdf/`;
+export type ReportFormat =
+  | "clinician"
+  | "patient"
+  | "hospital"
+  | "ops";
+
+export function getReportPdfUrl(
+  reportId: string | number,
+  format: ReportFormat = "clinician"
+) {
+  return `${API_URL}/reports/${reportId}/pdf/?report_format=${encodeURIComponent(
+    format
+  )}`;
 }
 
 export async function fetchEncounterConsents(id: string) {

@@ -10,7 +10,7 @@ import {
   updateReport,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
-import type { StructuredReport } from "@/types/report";
+import type { ReportFormat, StructuredReport } from "@/types/report";
 
 type Props = {
   encounterId: number;
@@ -93,6 +93,8 @@ export default function ReportForm({
   const [signature, setSignature] = useState({ signer_name: "", signer_role: "", signer_registration_number: "" });
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
+  const [reportFormat, setReportFormat] =
+    useState<ReportFormat>("clinician");
 
   useEffect(() => {
     getMe()
@@ -387,21 +389,43 @@ export default function ReportForm({
           ) : null}
 
           {report?.id ? (
-          <button
-            type="button"
-            onClick={() =>
-              window.open(
-                getReportPdfUrl(report.id),
-                "_blank",
-                "noopener,noreferrer"
-              )
-            }
-            className="rounded-lg border border-blue-600 bg-white px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
-          >
-            {report.report_status === "issued"
-              ? "Open Final PDF"
-              : "Preview Draft PDF"}
-          </button>
+            <>
+              <label className="flex items-center gap-2 rounded-lg border bg-slate-50 px-3 py-2 text-sm">
+                <span className="font-medium text-slate-700">
+                  Report format
+                </span>
+                <select
+                  value={reportFormat}
+                  onChange={(event) =>
+                    setReportFormat(
+                      event.target.value as ReportFormat
+                    )
+                  }
+                  className="rounded border bg-white px-2 py-1"
+                >
+                  <option value="clinician">Clinician</option>
+                  <option value="patient">Patient</option>
+                  <option value="hospital">Hospital</option>
+                  <option value="ops">Sentinel Ops / Audit</option>
+                </select>
+              </label>
+
+              <button
+                type="button"
+                onClick={() =>
+                  window.open(
+                    getReportPdfUrl(report.id, reportFormat),
+                    "_blank",
+                    "noopener,noreferrer"
+                  )
+                }
+                className="rounded-lg border border-blue-600 bg-white px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
+              >
+                {report.report_status === "issued"
+                  ? "Open Final PDF"
+                  : "Preview Draft PDF"}
+              </button>
+            </>
           ) : null}
 
           {canSubmit && workflowRoute === "sentinel_managed" ? (
