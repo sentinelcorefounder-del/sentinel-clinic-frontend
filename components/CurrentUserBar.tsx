@@ -76,6 +76,9 @@ function OpsNav() {
       <Link href="/ops/payments" className="hover:text-slate-950 hover:underline">
         Payments
       </Link>
+      <Link href="/ops/distribution" className="hover:text-slate-950 hover:underline">
+        Distribution
+      </Link>
       <Link href="/ops/notifications" className="hover:text-slate-950 hover:underline">
         Notifications
       </Link>

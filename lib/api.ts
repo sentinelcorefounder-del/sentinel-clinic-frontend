@@ -906,3 +906,85 @@ export async function clinicIssueReport(reportId: string | number, signature: { 
   if (!res.ok) throw new Error(formatApiError(data, "Failed to sign and issue report."));
   return data;
 }
+
+
+export type DistributionQueueItem = {
+  id: number;
+  report_id: string;
+  patient_id: string;
+  patient_name: string;
+  clinic_name: string;
+  source_type: string;
+  workflow_route: string;
+  referral_id: string;
+  source_hospital_name: string;
+  has_hospital_recipient: boolean;
+  report_status: string;
+  distribution_status: string;
+  patient_delivery_required: boolean;
+  issued_at: string;
+  hospital_released_at: string;
+  pdf_url: string;
+};
+
+export async function fetchDistributionQueue(params?: {
+  status?: string;
+  search?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.search) query.set("search", params.search);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+
+  const res = await fetch(`${API_URL}/ops/distribution/${suffix}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to load Distribution Centre.")
+    );
+  }
+  return data as DistributionQueueItem[];
+}
+
+export async function releaseReportToHospital(
+  reportId: string | number
+) {
+  const res = await fetch(
+    `${API_URL}/ops/distribution/${reportId}/release-hospital/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({}),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(formatApiError(data, "Failed to release report."));
+  }
+  return data;
+}
+
+export async function markPatientDeliveryRequired(
+  reportId: string | number
+) {
+  const res = await fetch(
+    `${API_URL}/ops/distribution/${reportId}/patient-required/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({}),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to mark patient delivery.")
+    );
+  }
+  return data;
+}
