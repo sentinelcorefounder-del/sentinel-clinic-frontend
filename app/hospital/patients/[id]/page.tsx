@@ -9,6 +9,7 @@ import {
   type PatientTimelineEvent,
 } from "@/lib/api";
 import PatientTimeline from "@/components/PatientTimeline";
+import ReportFormatMenu from "@/components/ReportFormatMenu";
 
 function pretty(value?: string | null) {
   if (!value) return "-";
@@ -146,7 +147,8 @@ export default function HospitalPatientDetailPage() {
           <h1 className="text-2xl font-bold">
             {patient.first_name} {patient.last_name}
           </h1>
-          <p className="text-sm text-slate-600">{patient.patient_id}</p>
+          <p className="text-sm text-slate-600">Local ID: {patient.patient_id}</p>
+          <p className="mt-1 text-sm font-semibold text-blue-800">Sentinel Patient ID: {patient.sentinel_patient_id || "Identity pending"}</p>
         </div>
 
         <Link
@@ -158,6 +160,7 @@ export default function HospitalPatientDetailPage() {
       </div>
 
       <section className="sentinel-card grid gap-4 p-6 md:grid-cols-3">
+        <Info label="Sentinel Patient ID" value={patient.sentinel_patient_id || "Identity pending"} />
         <Info label="Date of birth" value={formatDate(patient.date_of_birth)} />
         <Info label="Sex" value={pretty(patient.sex)} />
         <Info label="Phone" value={patient.phone || "-"} />
@@ -207,15 +210,7 @@ export default function HospitalPatientDetailPage() {
             pretty(report.report_status),
             pretty(report.urgency_outcome),
             formatDate(report.issued_at),
-            <a
-              key={`pdf-${report.id}`}
-              href={report.pdf_url}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-blue-700 underline"
-            >
-              View PDF
-            </a>,
+            <ReportFormatMenu key={`pdf-${report.id}`} reportId={report.id} role="hospital" />,
           ])}
         />
       </section>

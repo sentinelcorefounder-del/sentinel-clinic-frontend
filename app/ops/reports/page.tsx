@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { serverFetch } from "@/lib/server-api";
+import ReportFormatMenu from "@/components/ReportFormatMenu";
 
 type Props = {
   searchParams?: Promise<
@@ -172,6 +173,7 @@ export default async function OpsReportsPage({
                       >
                         {report.patient_name || "Open patient"}
                       </Link>
+                      <div className="mt-1 font-mono text-xs text-slate-500">{report.sentinel_patient_id || report.patient_id || report.patient}</div>
                     </td>
 
                     <td className="p-3">
@@ -207,20 +209,7 @@ export default async function OpsReportsPage({
                       </Link>
                     </td>
 
-                    <td className="p-3">
-                      {report.report_pdf_url ? (
-                        <a
-                          href={report.report_pdf_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-700 underline"
-                        >
-                          View PDF
-                        </a>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
+                    <td className="p-3"><ReportFormatMenu reportId={report.id} role="ops" /></td>
                   </tr>
                 ))}
               </tbody>

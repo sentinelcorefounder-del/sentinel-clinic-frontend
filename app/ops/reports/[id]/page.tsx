@@ -8,6 +8,7 @@ import {
   rejectOpsReport,
   returnOpsReport,
 } from "@/lib/api";
+import ReportFormatMenu from "@/components/ReportFormatMenu";
 
 export default function OpsReportReviewPage({
   params,
@@ -183,7 +184,8 @@ export default function OpsReportReviewPage({
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Patient">
           <p>{report.patient_name}</p>
-          <p>{report.patient_id_display}</p>
+          <p>Sentinel ID: {report.sentinel_patient_id || report.patient?.sentinel_patient_id || "Identity pending"}</p>
+          <p>Local ID: {report.patient_id_display}</p>
           <p>Encounter: {report.encounter_id_display}</p>
         </Card>
 
@@ -219,16 +221,7 @@ export default function OpsReportReviewPage({
           <p><strong>Return reason:</strong> {report.return_reason || "-"}</p>
         </div>
 
-        {report.report_pdf_url ? (
-          <a
-            href={report.report_pdf_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-4 inline-block text-blue-700 underline"
-          >
-            Open Clinical PDF
-          </a>
-        ) : null}
+<div className="mt-4"><ReportFormatMenu reportId={report.id} role="ops" /></div>
       </section>
 
       <section className="rounded-xl bg-white p-6 shadow">

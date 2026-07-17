@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
+  fetchPatientActiveReferrals,
   fetchPatientById,
   fetchPatientConsents,
   fetchPatientEncounters,
@@ -11,10 +12,16 @@ import {
   fetchPatientUploads,
   fetchPatientTimeline,
   getReportPdfUrl,
+  requestHistoricalAccess,
 } from "@/lib/api";
 import type { ImageUpload } from "@/types/upload";
 import PatientTimeline from "@/components/PatientTimeline";
+import ReportFormatMenu from "@/components/ReportFormatMenu";
 import type { PatientTimelineEvent } from "@/lib/api";
+import type {
+  ActiveHospitalReferral,
+  ActiveReferralResponse,
+} from "@/types/encounter";
 
 type Patient = {
   id: number;
@@ -28,6 +35,8 @@ type Patient = {
   consent_status?: string;
   assigned_clinic?: number | null;
   referral_id?: string;
+  sentinel_patient_id?: string;
+  master_patient_id?: number | null;
 };
 
 type Encounter = {
@@ -36,6 +45,9 @@ type Encounter = {
   encounter_date: string;
   screening_status: string;
   encounter_type: string;
+  source_type?: string;
+  source_hospital_name?: string;
+  source_override_reason?: string;
 };
 
 type Report = {
@@ -88,11 +100,16 @@ export default function PatientDetailPage() {
   const [consents, setConsents] = useState<Consent[]>([]);
   const [uploads, setUploads] = useState<ImageUpload[]>([]);
   const [timeline, setTimeline] = useState<PatientTimelineEvent[]>([]);
+  const [activeReferrals, setActiveReferrals] =
+    useState<ActiveHospitalReferral[]>([]);
   const [selectedUploadIds, setSelectedUploadIds] = useState<number[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerUploads, setViewerUploads] = useState<ImageUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [accessMessage, setAccessMessage] = useState("");
+  const [requestingAccess, setRequestingAccess] =
+    useState(false);
 
   useEffect(() => {
     async function load() {
@@ -100,14 +117,22 @@ export default function PatientDetailPage() {
         setLoading(true);
         setError("");
 
-        const [patientData, encounterData, reportData, consentData, uploadData, timelineData] =
-          await Promise.all([
+        const [
+          patientData,
+          encounterData,
+          reportData,
+          consentData,
+          uploadData,
+          timelineData,
+          referralData,
+        ] = await Promise.all([
             fetchPatientById(id),
             fetchPatientEncounters(id),
             fetchPatientReports(id),
             fetchPatientConsents(id),
             fetchPatientUploads(id),
             fetchPatientTimeline(id, "clinic"),
+            fetchPatientActiveReferrals(id),
           ]);
 
         setPatient(patientData);
@@ -116,6 +141,10 @@ export default function PatientDetailPage() {
         setConsents(consentData);
         setUploads(uploadData);
         setTimeline(timelineData.events || []);
+        setActiveReferrals(
+          (referralData as ActiveReferralResponse)
+            .active_referrals || []
+        );
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : "Failed to load patient details.");
@@ -159,6 +188,48 @@ export default function PatientDetailPage() {
 
   function clearSelection() {
     setSelectedUploadIds([]);
+  }
+
+  async function requestPreviousRecords() {
+    const purpose =
+      window.prompt(
+        "Clinical reason for requesting previous Sentinel records:"
+      ) || "";
+
+    if (!purpose.trim()) return;
+
+    const consentReference =
+      window.prompt(
+        "Enter the granted data-sharing consent ID/reference:"
+      ) || "";
+
+    if (!consentReference.trim()) return;
+
+    try {
+      setRequestingAccess(true);
+      setAccessMessage("");
+      setError("");
+
+      const created = await requestHistoricalAccess({
+        patient: patient?.id || id,
+        purpose,
+        consent_reference: consentReference,
+        include_reports: true,
+        include_images: true,
+      });
+
+      setAccessMessage(
+        `Historical access request submitted. Status: ${created.status}.`
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to request previous records."
+      );
+    } finally {
+      setRequestingAccess(false);
+    }
   }
 
   if (loading) return <main className="p-10">Loading patient...</main>;
@@ -214,18 +285,40 @@ export default function PatientDetailPage() {
           <h1 className="text-2xl font-bold">
             {patient.first_name} {patient.last_name}
           </h1>
-          <p className="text-sm text-gray-600">{patient.patient_id}</p>
+          <p className="text-sm text-gray-600">Local ID: {patient.patient_id}</p>
+          <p className="mt-1 text-sm font-semibold text-blue-800">
+            Sentinel Patient ID: {patient.sentinel_patient_id || "Identity pending"}
+          </p>
         </div>
 
-        <Link
-          href={`/retinal-assessments/new?patientId=${patient.id}`}
-          className="sentinel-primary-button"
-        >
-          New Retinal Assessment
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={requestPreviousRecords}
+            disabled={requestingAccess}
+            className="sentinel-secondary-button"
+          >
+            {requestingAccess
+              ? "Submitting Request..."
+              : "Request Previous Sentinel Records"}
+          </button>
+          <Link
+            href={`/retinal-assessments/new?patientId=${patient.id}`}
+            className="sentinel-primary-button"
+          >
+            New Retinal Assessment
+          </Link>
+        </div>
       </div>
 
+      {accessMessage ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          {accessMessage}
+        </div>
+      ) : null}
+
       <section className="sentinel-card grid gap-4 p-6 md:grid-cols-3">
+        <Info label="Sentinel Patient ID" value={patient.sentinel_patient_id || "Identity pending"} />
         <Info label="DOB" value={patient.date_of_birth || "-"} />
         <Info label="Sex" value={pretty(patient.sex)} />
         <Info label="Phone" value={patient.phone || "-"} />
@@ -233,6 +326,34 @@ export default function PatientDetailPage() {
         <Info label="Consent" value={pretty(patient.consent_status)} />
         <Info label="Referral ID" value={patient.referral_id || "-"} />
       </section>
+
+      {activeReferrals.length > 0 ? (
+        <section className="sentinel-card border-blue-200 bg-blue-50 p-5">
+          <h2 className="text-lg font-semibold text-blue-950">
+            Active Hospital Referrals
+          </h2>
+          <p className="mt-1 text-sm text-blue-900">
+            A new assessment must use the correct referral unless an
+            authorised separate direct-episode override is recorded.
+          </p>
+          <div className="mt-4 space-y-2">
+            {activeReferrals.map((referral) => (
+              <div
+                key={referral.id}
+                className="rounded-lg border border-blue-200 bg-white p-3 text-sm"
+              >
+                <p className="font-semibold">
+                  {referral.source_hospital_name || "Hospital"}
+                </p>
+                <p>
+                  {referral.referral_id} ·{" "}
+                  {pretty(referral.referral_status)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <PatientTimeline events={timeline} />
 
@@ -295,7 +416,9 @@ export default function PatientDetailPage() {
               {encounter.encounter_id}
             </Link>,
             pretty(encounter.screening_status),
-            pretty(encounter.encounter_type),
+            encounter.source_hospital_name
+              ? `${pretty(encounter.source_type)} — ${encounter.source_hospital_name}`
+              : pretty(encounter.source_type || encounter.encounter_type),
           ])}
         />
 
@@ -303,15 +426,10 @@ export default function PatientDetailPage() {
           title="Reports"
           rows={reports.map((report) => [
             report.review_date,
-            <a
-              key={`report-${report.id}`}
-              href={getReportPdfUrl(report.id)}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-blue-700 underline"
-            >
-              {report.report_id}
-            </a>,
+            <div key={`report-${report.id}`} className="space-y-2">
+              <p className="font-semibold">{report.report_id}</p>
+              <ReportFormatMenu reportId={report.id} role="clinic" />
+            </div>,
             `R: ${pretty(report.right_dr_grade)} / L: ${pretty(report.left_dr_grade)}`,
             pretty(report.report_status),
           ])}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ReportFormatMenu from "@/components/ReportFormatMenu";
 import {
   fetchHospitalPatients,
   type HospitalPatientListItem,
@@ -178,7 +179,7 @@ export default function HospitalPatientsPage() {
                   <td className="p-4 font-semibold text-slate-950">
                     {patient.patient_name}
                   </td>
-                  <td className="p-4">{patient.patient_id}</td>
+                  <td className="p-4 font-mono text-xs">{patient.sentinel_patient_id || patient.patient_id}</td>
                   <td className="p-4">{patient.hospital_mrn || "-"}</td>
                   <td className="p-4">{patient.referral_id}</td>
                   <td className="p-4">{patient.clinic_name || "Not assigned"}</td>
@@ -193,9 +194,10 @@ export default function HospitalPatientsPage() {
                   </td>
                   <td className="p-4">
                     <div>{patient.report_id || "-"}</div>
-                    <div className="text-xs text-slate-500">
-                      {pretty(patient.report_status)}
-                    </div>
+                    <div className="text-xs text-slate-500">{pretty(patient.report_status)}</div>
+                    {patient.report_pk && patient.report_ready ? (
+                      <div className="mt-2"><ReportFormatMenu reportId={patient.report_pk} role="hospital" /></div>
+                    ) : null}
                   </td>
                   <td className="p-4">
                     <span

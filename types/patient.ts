@@ -19,6 +19,8 @@ export type Patient = {
   state: string;
   country: string;
   consent_status: string;
+  sentinel_patient_id?: string;
+  master_patient_id?: number | null;
 
   source_type: "clinic_direct" | "hospital_referral";
   referring_hospital_id?: number | null;

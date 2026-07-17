@@ -1,24 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   createClinicDirectPatient,
   createEncounter,
   fetchMyOrganizationCapabilities,
+  fetchPatientActiveReferrals,
   fetchPatients,
   type OrganizationCapabilityProfile,
 } from "@/lib/api";
+import type {
+  ActiveHospitalReferral,
+  ActiveReferralResponse,
+  EncounterSourceType,
+  EncounterWorkflowRoute,
+} from "@/types/encounter";
 
 type PatientMode = "existing" | "new";
-
-type WorkflowRoute =
-  | "clinic_managed"
-  | "sentinel_managed";
 
 type NewPatientForm = {
   first_name: string;
@@ -33,153 +33,155 @@ type NewPatientForm = {
   country: string;
 };
 
-function today(): string {
+function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function generateAssessmentId(): string {
+function encounterId() {
   return `ENC-${Date.now().toString().slice(-10)}`;
+}
+
+function pretty(value?: string) {
+  return (value || "-")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export default function NewRetinalAssessmentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const patientIdFromUrl =
-    searchParams.get("patientId");
+  const patientIdFromUrl = searchParams.get("patientId");
 
   const [profile, setProfile] =
-    useState<OrganizationCapabilityProfile | null>(
-      null
-    );
-
-  const [patients, setPatients] = useState<any[]>(
-    []
-  );
-
-  const [mode, setMode] =
-    useState<PatientMode>("existing");
-
-  const [selectedPatientId, setSelectedPatientId] =
-    useState("");
-
+    useState<OrganizationCapabilityProfile | null>(null);
+  const [patients, setPatients] = useState<any[]>([]);
+  const [mode, setMode] = useState<PatientMode>("existing");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [activeReferrals, setActiveReferrals] =
+    useState<ActiveHospitalReferral[]>([]);
+  const [overrideAllowed, setOverrideAllowed] = useState(false);
+  const [sourceType, setSourceType] =
+    useState<EncounterSourceType>("clinic_direct");
+  const [selectedReferralId, setSelectedReferralId] = useState("");
+  const [overrideReason, setOverrideReason] = useState("");
   const [workflowRoute, setWorkflowRoute] =
-    useState<WorkflowRoute>("clinic_managed");
+    useState<EncounterWorkflowRoute>("clinic_managed");
 
-  const [assessmentDate, setAssessmentDate] =
-    useState(today());
+  const [assessmentDate, setAssessmentDate] = useState(today());
+  const [diabetesDuration, setDiabetesDuration] = useState("");
+  const [symptomsNotes, setSymptomsNotes] = useState("");
+  const [clinicalNotes, setClinicalNotes] = useState("");
 
-  const [
-    diabetesDuration,
-    setDiabetesDuration,
-  ] = useState("");
+  const [newPatient, setNewPatient] = useState<NewPatientForm>({
+    first_name: "",
+    last_name: "",
+    date_of_birth: "",
+    sex: "female",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    state: "",
+    country: "Nigeria",
+  });
 
-  const [symptomsNotes, setSymptomsNotes] =
-    useState("");
-
-  const [clinicalNotes, setClinicalNotes] =
-    useState("");
-
-  const [newPatient, setNewPatient] =
-    useState<NewPatientForm>({
-      first_name: "",
-      last_name: "",
-      date_of_birth: "",
-      sex: "female",
-      phone: "",
-      email: "",
-      address: "",
-      city: "",
-      state: "",
-      country: "Nigeria",
-    });
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [saving, setSaving] =
-    useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [checkingReferrals, setCheckingReferrals] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function loadPage() {
+    async function load() {
       try {
         setLoading(true);
-        setError("");
-
-        const [
-          capabilityProfile,
-          patientData,
-        ] = await Promise.all([
+        const [capability, patientData] = await Promise.all([
           fetchMyOrganizationCapabilities(),
           fetchPatients(),
         ]);
-
-        setProfile(capabilityProfile);
+        setProfile(capability);
         setPatients(patientData);
-
-        if (
-          capabilityProfile.workflow_mode ===
-          "sentinel_managed"
-        ) {
-          setWorkflowRoute(
-            "sentinel_managed"
-          );
-        }
-
-        if (
-          capabilityProfile.workflow_mode ===
-          "clinic_managed"
-        ) {
-          setWorkflowRoute(
-            "clinic_managed"
-          );
-        }
-
+        setWorkflowRoute(
+          capability.workflow_mode === "sentinel_managed"
+            ? "sentinel_managed"
+            : "clinic_managed"
+        );
         if (patientIdFromUrl) {
           setMode("existing");
-          setSelectedPatientId(
-            patientIdFromUrl
-          );
+          setSelectedPatientId(patientIdFromUrl);
         }
       } catch (err) {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load the retinal assessment form."
+            : "Failed to load assessment form."
         );
       } finally {
         setLoading(false);
       }
     }
-
-    loadPage();
+    load();
   }, [patientIdFromUrl]);
 
-  function updateNewPatientField(
+  useEffect(() => {
+    async function checkReferrals() {
+      setActiveReferrals([]);
+      setSelectedReferralId("");
+      setOverrideReason("");
+      setOverrideAllowed(false);
+
+      if (mode !== "existing" || !selectedPatientId) {
+        setSourceType("clinic_direct");
+        return;
+      }
+
+      try {
+        setCheckingReferrals(true);
+        const data = (await fetchPatientActiveReferrals(
+          selectedPatientId
+        )) as ActiveReferralResponse;
+        setActiveReferrals(data.active_referrals || []);
+        setOverrideAllowed(data.clinic_direct_override_allowed);
+
+        if (data.active_referrals.length === 1) {
+          setSourceType("hospital_referral");
+          setSelectedReferralId(
+            String(data.active_referrals[0].id)
+          );
+        } else if (data.active_referrals.length > 1) {
+          setSourceType("hospital_referral");
+        } else {
+          setSourceType("clinic_direct");
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to check active referrals."
+        );
+      } finally {
+        setCheckingReferrals(false);
+      }
+    }
+    checkReferrals();
+  }, [mode, selectedPatientId]);
+
+  function updateNewPatient(
     field: keyof NewPatientForm,
     value: string
   ) {
-    setNewPatient((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setNewPatient((current) => ({ ...current, [field]: value }));
   }
 
-  async function createAssessment() {
+  async function submit() {
     try {
       setSaving(true);
       setError("");
 
       if (!profile) {
-        throw new Error(
-          "Clinic capability profile is unavailable."
-        );
+        throw new Error("Clinic capability profile is unavailable.");
       }
 
-      let patientId =
-        selectedPatientId;
+      let patientId = selectedPatientId;
 
       if (mode === "new") {
         if (
@@ -191,131 +193,90 @@ export default function NewRetinalAssessmentPage() {
             "First name, last name and date of birth are required."
           );
         }
-
-        const createdPatient =
-          await createClinicDirectPatient(
-            newPatient
-          );
-
-        patientId = String(
-          createdPatient.id
-        );
+        const created = await createClinicDirectPatient(newPatient);
+        patientId = String(created.id);
       }
 
       if (!patientId) {
+        throw new Error("Select or create a patient.");
+      }
+
+      if (
+        sourceType === "hospital_referral" &&
+        !selectedReferralId
+      ) {
         throw new Error(
-          "Select an existing patient or create a new patient."
+          "Select the exact hospital referral for this assessment."
         );
       }
 
-      const effectiveWorkflowRoute:
-        WorkflowRoute =
-        profile.workflow_mode === "hybrid"
-          ? workflowRoute
-          : profile.workflow_mode ===
-              "sentinel_managed"
-            ? "sentinel_managed"
-            : "clinic_managed";
+      if (
+        sourceType === "clinic_direct" &&
+        activeReferrals.length > 0 &&
+        !overrideReason.trim()
+      ) {
+        throw new Error(
+          "Enter a reason for creating a separate clinic-direct episode."
+        );
+      }
 
-      const assessment =
-        await createEncounter({
-          encounter_id:
-            generateAssessmentId(),
+      const route: EncounterWorkflowRoute =
+        sourceType === "hospital_referral"
+          ? "sentinel_managed"
+          : profile.workflow_mode === "hybrid"
+            ? workflowRoute
+            : profile.workflow_mode === "sentinel_managed"
+              ? "sentinel_managed"
+              : "clinic_managed";
 
-          patient: Number(patientId),
+      const created = await createEncounter({
+        encounter_id: encounterId(),
+        patient: Number(patientId),
+        encounter_date: assessmentDate,
+        encounter_type: "retinal_assessment",
+        programme: "diabetic_screening",
+        source_type: sourceType,
+        hospital_referral:
+          sourceType === "hospital_referral"
+            ? Number(selectedReferralId)
+            : null,
+        source_override_reason:
+          sourceType === "clinic_direct"
+            ? overrideReason.trim()
+            : "",
+        workflow_route: route,
+        payment_responsibility:
+          sourceType === "hospital_referral"
+            ? "hospital"
+            : profile.default_payment_responsibility,
+        diabetes_duration: diabetesDuration,
+        symptoms_notes: symptomsNotes,
+        clinical_notes: clinicalNotes,
+      });
 
-          encounter_date:
-            assessmentDate,
-
-          encounter_type:
-            "retinal_assessment",
-
-          // Stable internal database value.
-          // This is not shown to users.
-          programme:
-            "diabetic_screening",
-
-          source_type:
-            "clinic_direct",
-
-          workflow_route:
-            effectiveWorkflowRoute,
-
-          payment_responsibility:
-            profile.default_payment_responsibility,
-
-          diabetes_duration:
-            diabetesDuration,
-
-          symptoms_notes:
-            symptomsNotes,
-
-          clinical_notes:
-            clinicalNotes,
-        });
-
-      router.push(
-        `/encounters/${assessment.id}`
-      );
+      router.push(`/encounters/${created.id}`);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to create the retinal assessment."
+          : "Failed to create assessment."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) {
-    return (
-      <main className="p-10">
-        Loading retinal assessment form...
-      </main>
-    );
-  }
-
-  if (
-    !profile?.clinic_direct_screening_enabled
-  ) {
-    return (
-      <main className="p-10">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
-          Clinic-direct retinal assessment
-          is not enabled for this clinic.
-          Ask Sentinel Ops to update the
-          clinic capability profile.
-        </div>
-      </main>
-    );
-  }
-
-  if (
-    !profile.can_create_direct_patients
-  ) {
-    return (
-      <main className="p-10">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
-          This clinic is not permitted to
-          create clinic-direct patient
-          records.
-        </div>
-      </main>
-    );
-  }
+  if (loading) return <main className="p-10">Loading...</main>;
 
   return (
-    <main className="sentinel-page max-w-3xl space-y-6">
+    <main className="sentinel-page max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">
           New Diabetic Retinal Assessment
         </h1>
-
         <p className="mt-1 text-sm text-slate-600">
-          Create a clinic-owned diabetic
-          retinal assessment without a
-          hospital referral.
+          Select the patient and the exact source of today&apos;s
+          assessment.
         </p>
       </div>
 
@@ -325,376 +286,290 @@ export default function NewRetinalAssessmentPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold">
-          Patient
-        </h2>
-
-        <div className="mb-4 flex flex-wrap gap-3">
+      <section className="rounded-2xl border bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold">1. Patient</h2>
+        <div className="mb-4 flex gap-3">
           <button
             type="button"
-            onClick={() =>
-              setMode("existing")
-            }
-            className={`rounded-xl border px-4 py-2 text-sm font-semibold ${
+            onClick={() => setMode("existing")}
+            className={`rounded-xl border px-4 py-2 ${
               mode === "existing"
                 ? "bg-slate-950 text-white"
-                : "bg-white text-slate-950"
+                : "bg-white"
             }`}
           >
-            Existing Patient
+            Existing Sentinel Patient
           </button>
-
           <button
             type="button"
-            onClick={() =>
-              setMode("new")
-            }
-            className={`rounded-xl border px-4 py-2 text-sm font-semibold ${
+            onClick={() => setMode("new")}
+            className={`rounded-xl border px-4 py-2 ${
               mode === "new"
                 ? "bg-slate-950 text-white"
-                : "bg-white text-slate-950"
+                : "bg-white"
             }`}
           >
-            New Patient
+            Patient Not Found
           </button>
         </div>
 
         {mode === "existing" ? (
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">
-              Select Patient
-            </span>
-
-            <select
-              value={selectedPatientId}
-              onChange={(event) =>
-                setSelectedPatientId(
-                  event.target.value
-                )
-              }
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-            >
-              <option value="">
-                Select patient
+          <select
+            value={selectedPatientId}
+            onChange={(event) =>
+              setSelectedPatientId(event.target.value)
+            }
+            className="w-full rounded-xl border p-3"
+          >
+            <option value="">Select patient</option>
+            {patients.map((patient) => (
+              <option key={patient.id} value={patient.id}>
+                {patient.patient_id} — {patient.first_name}{" "}
+                {patient.last_name}
               </option>
-
-              {patients.map((patient) => (
-                <option
-                  key={patient.id}
-                  value={patient.id}
-                >
-                  {patient.patient_id} —{" "}
-                  {patient.first_name}{" "}
-                  {patient.last_name}
-                </option>
-              ))}
-            </select>
-          </label>
+            ))}
+          </select>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label="First Name"
-              value={
-                newPatient.first_name
-              }
-              onChange={(value) =>
-                updateNewPatientField(
-                  "first_name",
-                  value
-                )
-              }
-              required
-            />
-
-            <Input
-              label="Last Name"
-              value={
-                newPatient.last_name
-              }
-              onChange={(value) =>
-                updateNewPatientField(
-                  "last_name",
-                  value
-                )
-              }
-              required
-            />
-
-            <Input
-              label="Date of Birth"
-              type="date"
-              value={
-                newPatient.date_of_birth
-              }
-              onChange={(value) =>
-                updateNewPatientField(
-                  "date_of_birth",
-                  value
-                )
-              }
-              required
-            />
-
+          <div className="grid gap-3 md:grid-cols-2">
+            {[
+              ["first_name", "First name"],
+              ["last_name", "Last name"],
+              ["date_of_birth", "Date of birth"],
+              ["phone", "Phone"],
+              ["email", "Email"],
+              ["address", "Address"],
+              ["city", "City"],
+              ["state", "State"],
+              ["country", "Country"],
+            ].map(([field, label]) => (
+              <label key={field}>
+                <span className="mb-1 block text-sm font-medium">
+                  {label}
+                </span>
+                <input
+                  type={
+                    field === "date_of_birth"
+                      ? "date"
+                      : field === "email"
+                        ? "email"
+                        : "text"
+                  }
+                  value={(newPatient as any)[field]}
+                  onChange={(event) =>
+                    updateNewPatient(
+                      field as keyof NewPatientForm,
+                      event.target.value
+                    )
+                  }
+                  className="w-full rounded-xl border p-3"
+                />
+              </label>
+            ))}
             <label>
               <span className="mb-1 block text-sm font-medium">
                 Sex
               </span>
-
               <select
                 value={newPatient.sex}
                 onChange={(event) =>
-                  updateNewPatientField(
-                    "sex",
-                    event.target.value
-                  )
+                  updateNewPatient("sex", event.target.value)
                 }
-                className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                className="w-full rounded-xl border p-3"
               >
-                <option value="female">
-                  Female
-                </option>
-                <option value="male">
-                  Male
-                </option>
-                <option value="other">
-                  Other
-                </option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Other</option>
               </select>
             </label>
-
-            <Input
-              label="Phone"
-              value={newPatient.phone}
-              onChange={(value) =>
-                updateNewPatientField(
-                  "phone",
-                  value
-                )
-              }
-            />
-
-            <Input
-              label="Email"
-              type="email"
-              value={newPatient.email}
-              onChange={(value) =>
-                updateNewPatientField(
-                  "email",
-                  value
-                )
-              }
-            />
-
-            <Input
-              label="Address"
-              value={newPatient.address}
-              onChange={(value) =>
-                updateNewPatientField(
-                  "address",
-                  value
-                )
-              }
-            />
-
-            <Input
-              label="City"
-              value={newPatient.city}
-              onChange={(value) =>
-                updateNewPatientField(
-                  "city",
-                  value
-                )
-              }
-            />
-
-            <Input
-              label="State"
-              value={newPatient.state}
-              onChange={(value) =>
-                updateNewPatientField(
-                  "state",
-                  value
-                )
-              }
-            />
-
-            <Input
-              label="Country"
-              value={newPatient.country}
-              onChange={(value) =>
-                updateNewPatientField(
-                  "country",
-                  value
-                )
-              }
-            />
           </div>
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      {mode === "existing" && selectedPatientId ? (
+        <section className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">
+            2. Assessment Pathway
+          </h2>
+
+          {checkingReferrals ? (
+            <p className="mt-3 text-sm">Checking referrals...</p>
+          ) : activeReferrals.length ? (
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+                Active referral
+                {activeReferrals.length === 1 ? "" : "s"} found.
+                Continue under the correct referral.
+              </div>
+
+              {activeReferrals.map((referral) => (
+                <label
+                  key={referral.id}
+                  className="block rounded-xl border p-4"
+                >
+                  <div className="flex gap-3">
+                    <input
+                      type="radio"
+                      checked={
+                        sourceType === "hospital_referral" &&
+                        selectedReferralId === String(referral.id)
+                      }
+                      onChange={() => {
+                        setSourceType("hospital_referral");
+                        setSelectedReferralId(
+                          String(referral.id)
+                        );
+                        setOverrideReason("");
+                      }}
+                    />
+                    <div>
+                      <p className="font-semibold">
+                        {referral.source_hospital_name}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {referral.referral_id} ·{" "}
+                        {pretty(referral.referral_status)}
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              ))}
+
+              <label className="block rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <div className="flex gap-3">
+                  <input
+                    type="radio"
+                    checked={sourceType === "clinic_direct"}
+                    disabled={!overrideAllowed}
+                    onChange={() => {
+                      setSourceType("clinic_direct");
+                      setSelectedReferralId("");
+                    }}
+                  />
+                  <div>
+                    <p className="font-semibold">
+                      Separate clinic-direct episode
+                    </p>
+                    <p className="text-sm">
+                      Requires an authorised override and reason.
+                    </p>
+                  </div>
+                </div>
+                {sourceType === "clinic_direct" ? (
+                  <textarea
+                    value={overrideReason}
+                    onChange={(event) =>
+                      setOverrideReason(event.target.value)
+                    }
+                    rows={3}
+                    placeholder="Mandatory override reason"
+                    className="mt-3 w-full rounded-xl border bg-white p-3"
+                  />
+                ) : null}
+              </label>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+              No active hospital referral found. This will be a
+              clinic-direct episode.
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      <section className="rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">
-          Assessment Setup
+          3. Assessment Setup
         </h2>
-
         <div className="grid gap-4 md:grid-cols-2">
-          <Input
-            label="Assessment Date"
-            type="date"
-            value={assessmentDate}
-            onChange={
-              setAssessmentDate
-            }
-            required
-          />
-
-          <Input
-            label="Diabetes Duration"
-            value={diabetesDuration}
-            onChange={
-              setDiabetesDuration
-            }
-            placeholder="e.g. 8 years"
-          />
+          <label>
+            <span className="mb-1 block text-sm font-medium">
+              Assessment date
+            </span>
+            <input
+              type="date"
+              value={assessmentDate}
+              onChange={(event) =>
+                setAssessmentDate(event.target.value)
+              }
+              className="w-full rounded-xl border p-3"
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-sm font-medium">
+              Diabetes duration
+            </span>
+            <input
+              value={diabetesDuration}
+              onChange={(event) =>
+                setDiabetesDuration(event.target.value)
+              }
+              className="w-full rounded-xl border p-3"
+            />
+          </label>
         </div>
 
-        {profile.workflow_mode ===
-        "hybrid" ? (
-          <label className="mt-4 block">
-            <span className="mb-1 block text-sm font-medium">
-              Workflow for this assessment
-            </span>
-
-            <select
-              value={workflowRoute}
-              onChange={(event) =>
-                setWorkflowRoute(
-                  event.target
-                    .value as WorkflowRoute
-                )
-              }
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-            >
-              <option value="clinic_managed">
-                Clinic Managed
-              </option>
-
-              <option value="sentinel_managed">
-                Sentinel Managed
-              </option>
-            </select>
-          </label>
-        ) : (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-            Workflow:{" "}
-            <strong>
-              {profile.workflow_mode
-                .replaceAll("_", " ")
-                .replace(
-                  /\b\w/g,
-                  (letter) =>
-                    letter.toUpperCase()
-                )}
-            </strong>
+        {sourceType === "hospital_referral" ? (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm">
+            Hospital referrals use Sentinel Managed workflow.
           </div>
-        )}
-
-        <label className="mt-4 block">
-          <span className="mb-1 block text-sm font-medium">
-            Symptoms / Intake Notes
-          </span>
-
-          <textarea
-            value={symptomsNotes}
+        ) : profile?.workflow_mode === "hybrid" ? (
+          <select
+            value={workflowRoute}
             onChange={(event) =>
-              setSymptomsNotes(
-                event.target.value
+              setWorkflowRoute(
+                event.target.value as EncounterWorkflowRoute
               )
             }
-            rows={4}
-            className="w-full rounded-xl border border-slate-300 px-3 py-2"
-          />
-        </label>
+            className="mt-4 w-full rounded-xl border p-3"
+          >
+            <option value="clinic_managed">
+              Clinic Managed
+            </option>
+            <option value="sentinel_managed">
+              Sentinel Managed
+            </option>
+          </select>
+        ) : null}
 
-        <label className="mt-4 block">
-          <span className="mb-1 block text-sm font-medium">
-            Clinical Notes
-          </span>
-
-          <textarea
-            value={clinicalNotes}
-            onChange={(event) =>
-              setClinicalNotes(
-                event.target.value
-              )
-            }
-            rows={4}
-            className="w-full rounded-xl border border-slate-300 px-3 py-2"
-          />
-        </label>
+        <textarea
+          value={symptomsNotes}
+          onChange={(event) =>
+            setSymptomsNotes(event.target.value)
+          }
+          placeholder="Symptoms / intake notes"
+          rows={3}
+          className="mt-4 w-full rounded-xl border p-3"
+        />
+        <textarea
+          value={clinicalNotes}
+          onChange={(event) =>
+            setClinicalNotes(event.target.value)
+          }
+          placeholder="Clinical notes"
+          rows={3}
+          className="mt-4 w-full rounded-xl border p-3"
+        />
       </section>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex gap-3">
         <button
           type="button"
-          onClick={() =>
-            router.push(
-              "/retinal-assessments"
-            )
-          }
-          className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold"
+          onClick={() => router.push("/retinal-assessments")}
+          className="rounded-xl border px-5 py-3"
         >
           Cancel
         </button>
-
         <button
           type="button"
-          onClick={createAssessment}
-          disabled={saving}
+          onClick={submit}
+          disabled={saving || checkingReferrals}
           className="rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white disabled:opacity-50"
         >
           {saving
-            ? "Creating Assessment..."
+            ? "Creating..."
             : "Create Assessment and Open Record"}
         </button>
       </div>
     </main>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-  required?: boolean;
-}) {
-  return (
-    <label>
-      <span className="mb-1 block text-sm font-medium">
-        {label}
-        {required ? " *" : ""}
-      </span>
-
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        required={required}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        className="w-full rounded-xl border border-slate-300 px-3 py-2"
-      />
-    </label>
   );
 }

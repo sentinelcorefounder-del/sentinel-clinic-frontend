@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchHospitalReportById } from "@/lib/api";
+import ReportFormatMenu from "@/components/ReportFormatMenu";
 
 export default function HospitalReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [report, setReport] = useState<any>(null);
@@ -23,7 +24,8 @@ export default function HospitalReportDetailPage({ params }: { params: Promise<{
       </div>
       <section className="grid gap-4 rounded-xl border bg-white p-6 md:grid-cols-3">
         <Info label="Patient" value={report.patient_name} />
-        <Info label="Patient ID" value={report.patient_id} />
+        <Info label="Sentinel Patient ID" value={report.sentinel_patient_id || report.patient?.sentinel_patient_id || "Identity pending"} />
+        <Info label="Local Patient ID" value={report.patient_id} />
         <Info label="Referral ID" value={report.referral_id} />
         <Info label="Clinic" value={report.clinic_name || "-"} />
         <Info label="Review date" value={report.review_date || "-"} />
@@ -38,7 +40,7 @@ export default function HospitalReportDetailPage({ params }: { params: Promise<{
         <p className="mt-4"><strong>Outcome:</strong> {report.urgency_outcome?.replaceAll("_", " ") || "-"}</p>
         <p className="mt-2"><strong>Recommendation:</strong> {report.recommendation || "-"}</p>
         <p className="mt-2"><strong>Follow-up:</strong> {report.next_followup_interval || "-"}</p>
-        <a href={report.pdf_url} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded bg-blue-700 px-4 py-2 font-semibold text-white">View / Download PDF</a>
+        <div className="mt-5"><ReportFormatMenu reportId={report.id} role="hospital" /></div>
       </section>
       <section className="rounded-xl border bg-white p-6">
         <h2 className="mb-4 text-xl font-semibold">Fundus Images</h2>

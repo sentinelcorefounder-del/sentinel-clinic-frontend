@@ -62,4 +62,38 @@ export type StructuredReport = {
 
   created_at: string;
   updated_at: string;
+
+    recall_months?: number | null;
+  recall_due_date?: string | null;
+
+  recall_status?:
+    | "not_set"
+    | "scheduled"
+    | "due_soon"
+    | "due"
+    | "overdue"
+    | "contacted"
+    | "booked"
+    | "completed"
+    | "deferred";
+
+  recall_contacted_at?: string | null;
+  recall_booked_at?: string | null;
+  recall_completed_at?: string | null;
+  recall_note?: string;
+
+  generated_clinical_summary?: string;
+  final_clinical_summary?: string;
+  clinical_summary_overridden?: boolean;
+
+  distribution_status?:
+    | "not_ready"
+    | "awaiting_distribution"
+    | "released_to_hospital"
+    | "completed";
+
+  hospital_released_at?: string | null;
+  hospital_released_by?: number | null;
+  patient_delivery_required?: boolean;
+  patient_delivered_at?: string | null;
 };

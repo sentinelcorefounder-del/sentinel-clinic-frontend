@@ -10,7 +10,7 @@ import {
   updateReport,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
-import type { ReportFormat, StructuredReport } from "@/types/report";
+import type { StructuredReport } from "@/types/report";
 
 type Props = {
   encounterId: number;
@@ -69,6 +69,9 @@ function blankForm(encounterId: number, patientId: number, encounter?: Props["en
     urgency_outcome: "routine_followup",
     recommendation: "",
     next_followup_interval: "",
+    recall_months: "",
+    final_clinical_summary: "",
+    clinical_summary_overridden: false,
     notes: "",
   };
 }
@@ -93,8 +96,6 @@ export default function ReportForm({
   const [signature, setSignature] = useState({ signer_name: "", signer_role: "", signer_registration_number: "" });
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
-  const [reportFormat, setReportFormat] =
-    useState<ReportFormat>("clinician");
 
   useEffect(() => {
     getMe()
@@ -125,6 +126,13 @@ export default function ReportForm({
         urgency_outcome: existingReport.urgency_outcome || "routine_followup",
         recommendation: existingReport.recommendation || "",
         next_followup_interval: existingReport.next_followup_interval || "",
+        recall_months: existingReport.recall_months
+          ? String(existingReport.recall_months)
+          : "",
+        final_clinical_summary:
+          existingReport.final_clinical_summary || "",
+        clinical_summary_overridden:
+          Boolean(existingReport.clinical_summary_overridden),
         notes: existingReport.notes || "",
       });
 
@@ -356,8 +364,43 @@ export default function ReportForm({
           <option value="image_retake">Image Retake</option>
         </select>
 
-        <input name="next_followup_interval" value={formData.next_followup_interval} onChange={handleChange} placeholder="Next Follow-up Interval" className="w-full rounded border p-3" disabled={!isEditable} />
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">
+            Recall period in months (1–24)
+          </span>
+          <input
+            name="recall_months"
+            type="number"
+            min={1}
+            max={24}
+            value={formData.recall_months}
+            onChange={handleChange}
+            placeholder="e.g. 12"
+            className="w-full rounded border p-3"
+            disabled={!isEditable}
+          />
+        </label>
         <textarea name="recommendation" value={formData.recommendation} onChange={handleChange} placeholder="Recommendation" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">
+            Final clinical interpretation
+          </span>
+          <textarea
+            name="final_clinical_summary"
+            value={formData.final_clinical_summary}
+            onChange={(event) =>
+              setFormData((current: any) => ({
+                ...current,
+                final_clinical_summary: event.target.value,
+                clinical_summary_overridden: true,
+              }))
+            }
+            placeholder="Generated from grades; edit only when clinically necessary."
+            className="w-full rounded border p-3"
+            rows={5}
+            disabled={!isEditable}
+          />
+        </label>
         <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Notes" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
 
         {report?.id && workflowRoute === "clinic_managed" && canSubmit ? (
@@ -389,43 +432,21 @@ export default function ReportForm({
           ) : null}
 
           {report?.id ? (
-            <>
-              <label className="flex items-center gap-2 rounded-lg border bg-slate-50 px-3 py-2 text-sm">
-                <span className="font-medium text-slate-700">
-                  Report format
-                </span>
-                <select
-                  value={reportFormat}
-                  onChange={(event) =>
-                    setReportFormat(
-                      event.target.value as ReportFormat
-                    )
-                  }
-                  className="rounded border bg-white px-2 py-1"
-                >
-                  <option value="clinician">Clinician</option>
-                  <option value="patient">Patient</option>
-                  <option value="hospital">Hospital</option>
-                  <option value="ops">Sentinel Ops / Audit</option>
-                </select>
-              </label>
-
-              <button
-                type="button"
-                onClick={() =>
-                  window.open(
-                    getReportPdfUrl(report.id, reportFormat),
-                    "_blank",
-                    "noopener,noreferrer"
-                  )
-                }
-                className="rounded-lg border border-blue-600 bg-white px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
-              >
-                {report.report_status === "issued"
-                  ? "Open Final PDF"
-                  : "Preview Draft PDF"}
-              </button>
-            </>
+          <button
+            type="button"
+            onClick={() =>
+              window.open(
+                getReportPdfUrl(report.id),
+                "_blank",
+                "noopener,noreferrer"
+              )
+            }
+            className="rounded-lg border border-blue-600 bg-white px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
+          >
+            {report.report_status === "issued"
+              ? "Open Final PDF"
+              : "Preview Draft PDF"}
+          </button>
           ) : null}
 
           {canSubmit && workflowRoute === "sentinel_managed" ? (

@@ -214,12 +214,43 @@ export async function createEncounter(data: any) {
     body: JSON.stringify(data),
   });
 
+  const responseData = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to create encounter: ${res.status} ${text}`);
+    throw new Error(
+      formatApiError(
+        responseData,
+        "Failed to create encounter."
+      )
+    );
   }
 
-  return res.json();
+  return responseData;
+}
+
+export async function fetchPatientActiveReferrals(
+  patientId: string | number
+) {
+  const res = await fetch(
+    `${API_URL}/encounters/patient/${patientId}/active-referrals/`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to check active referrals."
+      )
+    );
+  }
+
+  return data;
 }
 
 export async function fetchEncounterById(id: string) {
@@ -715,6 +746,7 @@ export async function fetchPatientTimeline(
 export type HospitalPatientListItem = {
   patient_pk: number;
   patient_id: string;
+  sentinel_patient_id?: string;
   patient_name: string;
   date_of_birth?: string;
   sex?: string;
@@ -912,6 +944,7 @@ export type DistributionQueueItem = {
   id: number;
   report_id: string;
   patient_id: string;
+  sentinel_patient_id?: string | null;
   patient_name: string;
   clinic_name: string;
   source_type: string;
@@ -987,4 +1020,377 @@ export async function markPatientDeliveryRequired(
     );
   }
   return data;
+}
+
+
+export type RecallQueueItem = {
+  id: number;
+  report_id: string;
+  patient_id: string;
+  sentinel_patient_id?: string | null;
+  patient_name: string;
+  patient_email: string;
+  clinic_name: string;
+  recall_months: number;
+  recall_due_date: string;
+  recall_status: string;
+  recall_note: string;
+};
+
+export async function fetchRecallQueue(
+  statusFilter = "all"
+) {
+  const res = await fetch(
+    `${API_URL}/reports/recalls/?status=${encodeURIComponent(
+      statusFilter
+    )}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+  const data = await res.json().catch(() => []);
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to load recall queue.")
+    );
+  }
+  return data as RecallQueueItem[];
+}
+
+export async function runRecallAction(
+  reportId: number | string,
+  action:
+    | "contacted"
+    | "booked"
+    | "completed"
+    | "deferred"
+    | "send_email",
+  note = ""
+) {
+  const res = await fetch(
+    `${API_URL}/reports/recalls/${reportId}/action/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({ action, note }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to update recall.")
+    );
+  }
+  return data;
+}
+
+export type PatientReportDelivery = {
+  id: number;
+  report: number;
+  report_id_display: string;
+  patient: number;
+  patient_name: string;
+  recipient: string;
+  include_images: boolean;
+  consent_confirmed: boolean;
+  status: string;
+  failure_reason: string;
+  sent_at?: string | null;
+  created_at: string;
+};
+
+export async function fetchPatientDeliveries(
+  statusFilter = ""
+) {
+  const suffix = statusFilter
+    ? `?status=${encodeURIComponent(statusFilter)}`
+    : "";
+  const res = await fetch(
+    `${API_URL}/reports/patient-deliveries/${suffix}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+  const data = await res.json().catch(() => []);
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to load patient deliveries."
+      )
+    );
+  }
+  return data as PatientReportDelivery[];
+}
+
+export async function createPatientDelivery(data: {
+  report: number | string;
+  recipient: string;
+  include_images?: boolean;
+  consent_confirmed: boolean;
+}) {
+  const res = await fetch(
+    `${API_URL}/reports/patient-deliveries/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify(data),
+    }
+  );
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        responseData,
+        "Failed to create patient delivery."
+      )
+    );
+  }
+  return responseData as PatientReportDelivery;
+}
+
+export async function sendPatientDelivery(
+  deliveryId: number | string
+) {
+  const res = await fetch(
+    `${API_URL}/reports/patient-deliveries/${deliveryId}/send/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({}),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(data, "Failed to send patient report.")
+    );
+  }
+  return data as PatientReportDelivery;
+}
+
+export type HistoricalAccessRequest = {
+  id: number;
+  master_patient: number;
+  master_patient_display: string;
+  patient_name: string;
+  requesting_organization: number;
+  requesting_organization_name: string;
+  requested_by_display: string;
+  purpose: string;
+  consent_reference: string;
+  consent_record?: number | null;
+  include_reports: boolean;
+  include_images: boolean;
+  status: string;
+  reviewed_by_display: string;
+  reviewed_at?: string | null;
+  review_note: string;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  is_currently_active: boolean;
+  created_at: string;
+};
+
+export async function requestHistoricalAccess(data: {
+  patient: number | string;
+  purpose: string;
+  consent_reference?: string;
+  consent_record?: number | string | null;
+  include_reports?: boolean;
+  include_images?: boolean;
+}) {
+  const res = await fetch(
+    `${API_URL}/patients/historical-access/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify(data),
+    }
+  );
+
+  const responseData = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        responseData,
+        "Failed to request historical access."
+      )
+    );
+  }
+
+  return responseData as HistoricalAccessRequest;
+}
+
+export async function fetchClinicHistoricalAccessRequests() {
+  const res = await fetch(
+    `${API_URL}/patients/historical-access/`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => []);
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to load historical access requests."
+      )
+    );
+  }
+
+  return data as HistoricalAccessRequest[];
+}
+
+export async function fetchHistoricalRecords(
+  requestId: number | string
+) {
+  const res = await fetch(
+    `${API_URL}/patients/historical-access/${requestId}/records/`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to load historical records."
+      )
+    );
+  }
+
+  return data;
+}
+
+export async function fetchOpsIdentityReviews() {
+  const res = await fetch(
+    `${API_URL}/ops/identity-reviews/`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => []);
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to load identity reviews."
+      )
+    );
+  }
+
+  return data;
+}
+
+export async function decideOpsIdentityReview(
+  reviewId: number | string,
+  decision: "link" | "keep_separate",
+  note = ""
+) {
+  const res = await fetch(
+    `${API_URL}/ops/identity-reviews/${reviewId}/decision/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({
+        decision,
+        note,
+      }),
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to complete identity review."
+      )
+    );
+  }
+
+  return data;
+}
+
+export async function fetchOpsHistoricalAccessRequests(
+  statusFilter = "pending"
+) {
+  const res = await fetch(
+    `${API_URL}/ops/historical-access/?status=${encodeURIComponent(
+      statusFilter
+    )}`,
+    {
+      cache: "no-store",
+      credentials: "include",
+    }
+  );
+
+  const data = await res.json().catch(() => []);
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to load historical access requests."
+      )
+    );
+  }
+
+  return data as HistoricalAccessRequest[];
+}
+
+export async function decideOpsHistoricalAccess(
+  requestId: number | string,
+  decision: "approve" | "reject" | "revoke",
+  options?: {
+    note?: string;
+    days?: number;
+  }
+) {
+  const res = await fetch(
+    `${API_URL}/ops/historical-access/${requestId}/decision/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({
+        decision,
+        note: options?.note || "",
+        days: options?.days || 30,
+      }),
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(
+        data,
+        "Failed to update historical access."
+      )
+    );
+  }
+
+  return data as HistoricalAccessRequest;
 }
