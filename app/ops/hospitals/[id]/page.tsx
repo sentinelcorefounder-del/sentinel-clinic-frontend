@@ -1,5 +1,6 @@
 "use client";
 
+import OrganizationFinanceCard from "@/components/OrganizationFinanceCard";
 import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -183,6 +184,8 @@ export default function OpsHospitalDetailPage({ params }: Props) {
           <p>Currency: {hospital.currency || "NGN"}</p>
         </Box>
       </div>
+
+      <OrganizationFinanceCard organizationId={hospital.id} />
 
       <Section title="Edit Hospital Charge">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

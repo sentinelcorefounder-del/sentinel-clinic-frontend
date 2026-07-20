@@ -1,5 +1,6 @@
 "use client";
 
+import OrganizationFinanceCard from "@/components/OrganizationFinanceCard";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -234,6 +235,8 @@ export default function OpsClinicDetailPage() {
           </p>
         </Box>
       </div>
+
+      <OrganizationFinanceCard organizationId={clinic.id} />
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="mb-5">

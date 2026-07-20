@@ -29,6 +29,15 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
   }, []);
 
   const currentPrice = useMemo(() => finance?.active_pricing_rules?.[0] || null, [finance]);
+  const lowBalance = Boolean(finance?.wallet && currentPrice && Number(finance.wallet.spendable_balance) < Number(currentPrice.gross_amount) * 5);
+
+  function exportStatement() {
+    if (!finance) return;
+    const rows = [["Date","Type","Reference","Available delta","Reserved delta"], ...finance.recent_ledger.map((entry) => [entry.created_at, entry.entry_type, entry.reference || entry.description || "", entry.available_delta, entry.reserved_delta])];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll(`"`, `""`)}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${finance.organization_name.replaceAll(" ", "-")}-wallet-statement.csv`; link.click(); URL.revokeObjectURL(url);
+  }
 
   async function topUp(event: React.FormEvent) {
     event.preventDefault();
@@ -56,6 +65,7 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
       </div>
 
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {lowBalance ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">Your wallet balance is below the cost of five assessments. Please top up soon to avoid interrupted service.</div> : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">Available balance</p><p className="mt-2 text-3xl font-bold">{money(finance.wallet?.available_balance, finance.wallet?.currency)}</p></div>
@@ -92,7 +102,7 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
       </section>
 
       <section className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-        <div className="border-b p-5"><h2 className="text-xl font-bold">Recent wallet activity</h2></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><h2 className="text-xl font-bold">Recent wallet activity</h2><button type="button" onClick={exportStatement} className="rounded-xl border px-4 py-2 text-sm font-semibold">Download CSV statement</button></div>
         <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left"><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Reference</th><th className="p-3 text-right">Available</th><th className="p-3 text-right">Reserved</th></tr></thead><tbody>{finance.recent_ledger.length ? finance.recent_ledger.map((entry) => <tr key={entry.id} className="border-t"><td className="p-3">{new Date(entry.created_at).toLocaleString()}</td><td className="p-3">{label(entry.entry_type)}</td><td className="p-3">{entry.reference || entry.description || "—"}</td><td className="p-3 text-right">{money(entry.available_delta, entry.currency)}</td><td className="p-3 text-right">{money(entry.reserved_delta, entry.currency)}</td></tr>) : <tr><td colSpan={5} className="p-8 text-center text-slate-500">No wallet activity yet.</td></tr>}</tbody></table></div>
       </section>
 
