@@ -1,0 +1,3 @@
+import { serverFetch } from "@/lib/server-api";
+import ContractManager from "./ContractManager";
+export default async function ContractsPage(){const [organizations,contracts,rules]=await Promise.all([serverFetch("/api/finance/organization-options/"),serverFetch("/api/finance/contracts/"),serverFetch("/api/finance/pricing-rules/")]); return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Contracts & Pricing</h1><p className="mt-1 text-slate-600">Configure a different agreed assessment charge for every hospital or clinic.</p></div><ContractManager organizations={organizations} contracts={contracts} rules={rules}/></div>}

@@ -1,0 +1,4 @@
+"use client";
+import { useState } from "react";
+import { financeWrite } from "@/lib/finance-api";
+export default function SettlementActions({id,status}:{id:number;status:string}){const [busy,setBusy]=useState(false);async function act(action:string){setBusy(true);try{const body=action==="mark-paid"?{external_reference:prompt("Payment reference")||""}:{};await financeWrite(`/api/finance/settlements/${id}/${action}/`,"POST",body);location.reload()}finally{setBusy(false)}}return <div className="flex gap-2">{status==="draft"?<button disabled={busy} onClick={()=>act("approve")} className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white">Approve</button>:null}{status==="approved"?<button disabled={busy} onClick={()=>act("mark-paid")} className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white">Mark paid</button>:null}</div>}

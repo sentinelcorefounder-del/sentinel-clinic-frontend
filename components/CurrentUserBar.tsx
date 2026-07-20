@@ -76,6 +76,9 @@ function OpsNav() {
       <Link href="/ops/payments" className="hover:text-slate-950 hover:underline">
         Payments
       </Link>
+      <Link href="/ops/finance" className="hover:text-slate-950 hover:underline">
+        Finance
+      </Link>
       <Link href="/ops/distribution" className="hover:text-slate-950 hover:underline">
         Distribution
       </Link>
@@ -123,6 +126,9 @@ function ClinicNav({ user }: { user: CurrentUser }) {
       <Link href="/reports" className="hover:text-slate-950 hover:underline">
         Reports
       </Link>
+      <Link href="/finance" className="hover:text-slate-950 hover:underline">
+        Finance
+      </Link>
 
       {isOps ? (
         <Link
@@ -156,6 +162,9 @@ function HospitalNav() {
       </Link>
       <Link href="/hospital/payouts" className="hover:text-slate-950 hover:underline">
         Payouts
+      </Link>
+      <Link href="/hospital/finance" className="hover:text-slate-950 hover:underline">
+        Finance
       </Link>
     </nav>
   );

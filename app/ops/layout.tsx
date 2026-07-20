@@ -35,6 +35,11 @@ const navSections = [
       ["Hospitals", "/ops/hospitals"],
       ["Clinics", "/ops/clinics"],
       ["Payments", "/ops/payments"],
+      ["Finance", "/ops/finance"],
+      ["Contracts & Pricing", "/ops/finance/contracts"],
+      ["Wallets", "/ops/finance/wallets"],
+      ["Ledger", "/ops/finance/ledger"],
+      ["Settlements", "/ops/finance/settlements"],
     ],
   },
   {
