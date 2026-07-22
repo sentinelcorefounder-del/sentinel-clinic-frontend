@@ -5,7 +5,10 @@ import OpsGlobalSearch from "@/components/OpsGlobalSearch";
 
 function canAccessOps(user: any) {
   const roles = user?.roles || [];
-  return user?.is_superuser || roles.includes("ops_admin") || roles.includes("sentinel_ops");
+  return user?.is_superuser || [
+    "ops_admin", "sentinel_ops", "finance_viewer", "finance_operator",
+    "finance_approver", "finance_admin", "finance_tester",
+  ].some((role) => roles.includes(role));
 }
 
 const navSections = [
@@ -40,6 +43,11 @@ const navSections = [
       ["Wallets", "/ops/finance/wallets"],
       ["Ledger", "/ops/finance/ledger"],
       ["Settlements", "/ops/finance/settlements"],
+      ["Funding approvals", "/ops/finance/funding"],
+      ["Allowances", "/ops/finance/allowances"],
+      ["Corrections", "/ops/finance/corrections"],
+      ["Reconciliation", "/ops/finance/reconciliation"],
+      ["Finance audit", "/ops/finance/audit"],
     ],
   },
   {
@@ -56,6 +64,14 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
   let user = null;
   try { user = await serverFetch("/api/auth/me/"); } catch { redirect("/login"); }
   if (!canAccessOps(user)) redirect("/");
+  const roles = user?.roles || [];
+  const isCoreOps = user?.is_superuser || roles.includes("ops_admin") || roles.includes("sentinel_ops");
+  const visibleSections = isCoreOps
+    ? navSections
+    : navSections.filter((section) => section.title === "Organisations & Finance").map((section) => ({
+        ...section,
+        links: section.links.filter(([, href]) => href.startsWith("/ops/finance")),
+      }));
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -63,7 +79,7 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
         <aside className="min-h-screen w-72 shrink-0 bg-slate-950 p-6 text-white">
           <h2 className="mb-8 text-xl font-bold">Sentinel Ops</h2>
           <nav className="space-y-6 text-sm">
-            {navSections.map((section) => (
+            {visibleSections.map((section) => (
               <section key={section.title}>
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{section.title}</p>
                 <div className="space-y-2">

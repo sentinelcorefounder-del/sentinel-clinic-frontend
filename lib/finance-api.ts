@@ -1,5 +1,5 @@
 import { ensureCsrf, getCookie } from "@/lib/auth";
-import type { PartnerFinance } from "@/types/finance";
+import type { BankTransferFunding, PartnerFinance } from "@/types/finance";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -16,6 +16,13 @@ export async function fetchMyFinance(): Promise<PartnerFinance> {
   const res = await fetch(`${API_URL}/api/finance/me/`, {
     credentials: "include",
     cache: "no-store",
+  });
+  return parseResponse(res);
+}
+
+export async function fetchMyBankTransfers(): Promise<BankTransferFunding[]> {
+  const res = await fetch(`${API_URL}/api/finance/bank-transfer-funding/`, {
+    credentials: "include", cache: "no-store",
   });
   return parseResponse(res);
 }
@@ -53,6 +60,18 @@ export async function financeWrite(path: string, method: "POST" | "PATCH", body:
     credentials: "include",
     headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
     body: JSON.stringify(body),
+  });
+  return parseResponse(res);
+}
+
+export async function financeWriteForm(path: string, body: FormData) {
+  await ensureCsrf();
+  const csrfToken = getCookie("csrftoken") || "";
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "X-CSRFToken": csrfToken },
+    body,
   });
   return parseResponse(res);
 }
