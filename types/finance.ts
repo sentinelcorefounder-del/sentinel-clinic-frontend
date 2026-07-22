@@ -93,3 +93,43 @@ export type FinanceDashboardSummary = {
   captured: number;
   settlements: Record<string, string>;
 };
+
+export type FinanceCapabilities = {
+  can_view: boolean;
+  can_operate: boolean;
+  can_approve: boolean;
+  can_administer: boolean;
+  can_request_corrections: boolean;
+  can_decide_corrections: boolean;
+  can_prepare_settlements: boolean;
+  can_approve_settlements: boolean;
+  can_configure_pricing: boolean;
+};
+
+export type FinanceActionRequest = {
+  id: number;
+  organization_name: string;
+  action_type: string;
+  amount: string;
+  currency: string;
+  status: string;
+  reason: string;
+  external_reference: string;
+  requested_by_username: string;
+  decided_by_username: string | null;
+  decision_reason: string;
+  created_at: string;
+};
+
+export type BankTransferFunding = {
+  id: number;
+  organization_name: string;
+  request_reference: string;
+  requested_amount: string;
+  received_amount: string | null;
+  currency: string;
+  status: string;
+  bank_transaction_reference: string;
+  value_date: string | null;
+  created_at: string;
+};
