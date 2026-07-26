@@ -7,7 +7,8 @@ export default function PatientsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-950">Patients</h1>
           <p className="mt-1 text-sm text-slate-700">
-            View hospital-referred patients and clinic-owned patients registered for direct diabetic retinal assessment.
+            View hospital-referred and clinic-direct patients, including their
+            diabetic, ocular or combined clinical pathways.
           </p>
         </div>
       </div>

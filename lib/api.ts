@@ -284,6 +284,121 @@ export async function updateEncounter(id: string | number, data: any) {
   return responseData;
 }
 
+export async function updateOcularAssessment(
+  encounterId: string | number,
+  data: any
+) {
+  const res = await fetch(
+    `${API_URL}/encounters/${encounterId}/ocular-assessment/`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify(data),
+    }
+  );
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      formatApiError(responseData, "Failed to save ocular assessment.")
+    );
+  }
+  return responseData;
+}
+
+export async function fetchOcularInvestigations(encounterId: string | number) {
+  const res = await fetch(
+    `${API_URL}/encounters/${encounterId}/ocular-investigations/`,
+    { cache: "no-store", credentials: "include" }
+  );
+  const data = await res.json().catch(() => ([]));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load investigations."));
+  return data;
+}
+
+export async function createOcularInvestigation(
+  encounterId: string | number,
+  formData: FormData
+) {
+  const res = await fetch(
+    `${API_URL}/encounters/${encounterId}/ocular-investigations/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(false),
+      body: formData,
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to upload investigation."));
+  return data;
+}
+
+export async function deleteOcularInvestigation(id: string | number) {
+  const res = await fetch(
+    `${API_URL}/encounters/ocular-investigations/${id}/`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: await getCsrfHeaders(false),
+    }
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(data, "Failed to delete investigation."));
+  }
+}
+
+export async function fetchOcularAIReviews(encounterId: string | number) {
+  const res = await fetch(
+    `${API_URL}/encounters/${encounterId}/ocular-ai-reviews/`,
+    { cache: "no-store", credentials: "include" }
+  );
+  const data = await res.json().catch(() => ({
+    reviews: [],
+    pricing: { amount: "0.00", currency: "NGN", one_review_per_encounter: true },
+  }));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load AI reviews."));
+  return data;
+}
+
+export async function requestOcularAIReview(
+  encounterId: string | number,
+  privacyConfirmed: boolean
+) {
+  const res = await fetch(
+    `${API_URL}/encounters/${encounterId}/ocular-ai-reviews/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({ privacy_confirmed: privacyConfirmed }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Sentinel AI review failed."));
+  return data;
+}
+
+export async function decideOcularAIReview(
+  reviewId: string | number,
+  decision: "accepted" | "modified" | "rejected",
+  notes: string
+) {
+  const res = await fetch(
+    `${API_URL}/encounters/ocular-ai-reviews/${reviewId}/decision/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: await getCsrfHeaders(true),
+      body: JSON.stringify({ decision, notes }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to record clinician decision."));
+  return data;
+}
+
 
 export async function filterEncounters(params: {
   search?: string;

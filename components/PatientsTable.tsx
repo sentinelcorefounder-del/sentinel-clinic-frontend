@@ -7,7 +7,17 @@ import {
   fetchClinicPatients,
   type PatientSourceFilter,
 } from "@/lib/patients-api";
+import { fetchEncounters } from "@/lib/api";
 import type { Patient } from "@/types/patient";
+import type { AssessmentProgramme } from "@/types/encounter";
+
+type PathwayFilter = "all" | AssessmentProgramme;
+
+const pathwayLabels: Record<AssessmentProgramme, string> = {
+  diabetic_screening: "Diabetic",
+  ocular_diagnostics: "Ocular",
+  combined_assessment: "Combined",
+};
 
 type HospitalLabel = {
   id: number;
@@ -18,9 +28,11 @@ type HospitalLabel = {
 export default function PatientsTable() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
+  const [encounters, setEncounters] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [source, setSource] =
     useState<PatientSourceFilter>("all");
+  const [pathway, setPathway] = useState<PathwayFilter>("all");
   const [hospitalId, setHospitalId] =
     useState<number | null>(null);
   const [hospitalLabelsOpen, setHospitalLabelsOpen] =
@@ -86,8 +98,12 @@ export default function PatientsTable() {
 
   async function loadPatientLabels() {
     try {
-      const data = await fetchClinicPatients();
+      const [data, encounterData] = await Promise.all([
+        fetchClinicPatients(),
+        fetchEncounters(),
+      ]);
       setAllPatients(data);
+      setEncounters(encounterData);
     } catch {
       setAllPatients([]);
     }
@@ -102,12 +118,14 @@ export default function PatientsTable() {
     nextSource: PatientSourceFilter
   ) {
     setSource(nextSource);
+    if (nextSource !== "clinic_direct") setPathway("all");
     setHospitalId(null);
     await loadPatients(nextSource, null);
   }
 
   async function chooseHospital(nextHospitalId: number) {
     setSource("hospital_referral");
+    setPathway("all");
     setHospitalId(nextHospitalId);
     await loadPatients("hospital_referral", nextHospitalId);
   }
@@ -115,6 +133,34 @@ export default function PatientsTable() {
   async function handleSearch(event: React.FormEvent) {
     event.preventDefault();
     await loadPatients();
+  }
+
+  const displayedPatients = useMemo(() => {
+    if (source !== "clinic_direct" || pathway === "all") return patients;
+    const matchingPatientIds = new Set(
+      encounters
+        .filter(
+          (encounter) =>
+            encounter.source_type === "clinic_direct" &&
+            encounter.programme === pathway
+        )
+        .map((encounter) => Number(encounter.patient))
+    );
+    return patients.filter((patient) => matchingPatientIds.has(patient.id));
+  }, [patients, encounters, source, pathway]);
+
+  function patientPathways(patientId: number) {
+    return Array.from(
+      new Set(
+        encounters
+          .filter(
+            (encounter) =>
+              Number(encounter.patient) === patientId &&
+              encounter.source_type === "clinic_direct"
+          )
+          .map((encounter) => encounter.programme as AssessmentProgramme)
+      )
+    );
   }
 
   return (
@@ -135,6 +181,26 @@ export default function PatientsTable() {
           label="Clinic Direct"
           onClick={() => chooseSource("clinic_direct")}
         />
+
+        {source === "clinic_direct" ? (
+          <div className="mb-3 mt-3 border-t border-slate-200 pt-4">
+            <label className="block px-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+              Clinical pathway
+              <select
+                value={pathway}
+                onChange={(event) =>
+                  setPathway(event.target.value as PathwayFilter)
+                }
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-900"
+              >
+                <option value="all">All pathways</option>
+                <option value="diabetic_screening">Diabetic</option>
+                <option value="ocular_diagnostics">Ocular</option>
+                <option value="combined_assessment">Combined</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
 
         <button
           type="button"
@@ -229,8 +295,8 @@ export default function PatientsTable() {
                 : "All Patients"}
           </p>
           <p className="mt-1 text-xs text-slate-600">
-            {patients.length} patient
-            {patients.length === 1 ? "" : "s"} shown
+            {displayedPatients.length} patient
+            {displayedPatients.length === 1 ? "" : "s"} shown
           </p>
         </div>
 
@@ -258,6 +324,9 @@ export default function PatientsTable() {
                     Source
                   </th>
                   <th className="p-4 text-sm font-semibold text-slate-900">
+                    Pathway
+                  </th>
+                  <th className="p-4 text-sm font-semibold text-slate-900">
                     Referring Hospital
                   </th>
                   <th className="p-4 text-sm font-semibold text-slate-900">
@@ -273,17 +342,17 @@ export default function PatientsTable() {
               </thead>
 
               <tbody>
-                {!patients.length ? (
+                {!displayedPatients.length ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="p-6 text-sm text-slate-700"
                     >
                       No patients found for this source.
                     </td>
                   </tr>
                 ) : (
-                  patients.map((patient) => (
+                  displayedPatients.map((patient) => (
                     <tr
                       key={patient.id}
                       className="border-t border-slate-200 hover:bg-slate-50"
@@ -305,6 +374,27 @@ export default function PatientsTable() {
                         <SourceBadge
                           source={patient.source_type}
                         />
+                      </td>
+
+                      <td className="p-4">
+                        {patient.source_type === "clinic_direct" ? (
+                          <div className="flex flex-wrap gap-1">
+                            {patientPathways(patient.id).length ? (
+                              patientPathways(patient.id).map((item) => (
+                                <span
+                                  key={item}
+                                  className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+                                >
+                                  {pathwayLabels[item] || item}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-slate-500">No encounter yet</span>
+                            )}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
                       </td>
 
                       <td className="p-4 text-sm text-slate-900">

@@ -20,6 +20,8 @@ import { ConsentRecord } from "@/types/consent";
 import ImageUploadForm from "@/components/ImageUploadForm";
 import ReportForm from "@/components/ReportForm";
 import ConsentForm from "@/components/ConsentForm";
+import OcularAssessmentForm from "@/components/OcularAssessmentForm";
+import OcularInvestigationsAIReview from "@/components/OcularInvestigationsAIReview";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -285,9 +287,15 @@ export default function EncounterDetailPage({ params }: Props) {
       <section className="rounded-lg border p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Retinal Assessment</h1>
+            <h1 className="text-2xl font-bold">
+              {encounter.programme === "ocular_diagnostics"
+                ? "General Ocular Assessment"
+                : encounter.programme === "combined_assessment"
+                  ? "Combined Diabetic and Ocular Assessment"
+                  : "Diabetic Retinal Assessment"}
+            </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Technician capture and clinical reporting for this retinal assessment.
+              Technician capture and programme-specific clinical reporting.
             </p>
           </div>
 
@@ -319,6 +327,9 @@ export default function EncounterDetailPage({ params }: Props) {
           </p>
           <p>
             <strong>Type:</strong> {displayValue(encounter.encounter_type)}
+          </p>
+          <p>
+            <strong>Programme:</strong> {displayValue(encounter.programme)}
           </p>
           <p>
             <strong>Consent Status:</strong> {patient.consent_status || "-"}
@@ -542,9 +553,11 @@ export default function EncounterDetailPage({ params }: Props) {
 
       <section className="rounded-lg border p-6">
         <div className="mb-4">
-          <h2 className="text-xl font-semibold">Uploaded Images</h2>
+          <h2 className="text-xl font-semibold">Fundus Photographs</h2>
           <p className="mt-1 text-sm text-gray-600">
-            One image is allowed per eye. Delete an image before uploading a replacement.
+            Upload each retinal image once. General ocular uploads are stored
+            only and do not activate any AI; diabetic AI runs only for diabetic
+            or combined pathways under its existing consent rules.
           </p>
         </div>
 
@@ -597,6 +610,7 @@ export default function EncounterDetailPage({ params }: Props) {
                     className="w-full rounded border"
                   />
 
+                  {encounter.programme !== "ocular_diagnostics" ? (
                   <div className="rounded-lg border bg-slate-50 p-4">
                     <h3 className="mb-3 text-lg font-semibold">AI Suggestion</h3>
 
@@ -646,6 +660,11 @@ export default function EncounterDetailPage({ params }: Props) {
                       </div>
                     )}
                   </div>
+                  ) : (
+                    <p className="rounded-lg border bg-blue-50 p-3 text-sm text-blue-900">
+                      Diabetic AI analysis is not run for general ocular-only assessments.
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -692,6 +711,32 @@ export default function EncounterDetailPage({ params }: Props) {
         )}
       </section>
 
+      {encounter.programme === "ocular_diagnostics" ||
+      encounter.programme === "combined_assessment" ? (
+        <OcularAssessmentForm
+          encounterId={encounter.id}
+          initial={encounter.ocular_assessment}
+          onSaved={(assessment) =>
+            setEncounter((current) =>
+              current ? { ...current, ocular_assessment: assessment } : current
+            )
+          }
+        />
+      ) : null}
+
+      {encounter.programme === "ocular_diagnostics" ||
+      encounter.programme === "combined_assessment" ? (
+        <OcularInvestigationsAIReview
+          encounterId={encounter.id}
+          assessment={encounter.ocular_assessment}
+          fundusUploads={uploads.map((upload) => ({
+            ...upload,
+            image_file: resolveFileUrl(upload.image_file),
+          }))}
+        />
+      ) : null}
+
+      {encounter.programme !== "ocular_diagnostics" ? (
       <section className="rounded-lg border p-6">
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Optometrist Report: Diabetic Grading</h2>
@@ -711,7 +756,9 @@ export default function EncounterDetailPage({ params }: Props) {
           onReportSaved={handleReportCreated}
         />
       </section>
+      ) : null}
 
+      {encounter.programme !== "ocular_diagnostics" ? (
       <section className="rounded-lg border p-6">
         <h2 className="mb-4 text-xl font-semibold">Structured Reports</h2>
 
@@ -816,6 +863,7 @@ export default function EncounterDetailPage({ params }: Props) {
           </div>
         )}
       </section>
+      ) : null}
     </main>
   );
 }
