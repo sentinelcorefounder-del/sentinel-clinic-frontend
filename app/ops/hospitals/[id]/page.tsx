@@ -1,6 +1,7 @@
 "use client";
 
 import OrganizationFinanceCard from "@/components/OrganizationFinanceCard";
+import OrganizationBrandingEditor from "@/components/OrganizationBrandingEditor";
 import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -146,6 +147,10 @@ export default function OpsHospitalDetailPage({ params }: Props) {
     <div>
       <h1 className="text-3xl font-bold mb-2">{hospital.name}</h1>
       <p className="text-slate-500 mb-6">{hospital.code}</p>
+      <OrganizationBrandingEditor
+        organization={hospital}
+        onSaved={(updated) => setHospital(updated)}
+      />
 
       {message ? (
         <div

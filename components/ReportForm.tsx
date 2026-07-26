@@ -11,6 +11,8 @@ import {
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import type { StructuredReport } from "@/types/report";
+import type { OcularInvestigation } from "@/types/encounter";
+import type { ImageUpload } from "@/types/upload";
 
 type Props = {
   encounterId: number;
@@ -27,6 +29,9 @@ type Props = {
     poor_va_reason?: string;
   } | null;
   onReportSaved?: () => Promise<void> | void;
+  programme?: string;
+  fundusUploads?: ImageUpload[];
+  ocularInvestigations?: OcularInvestigation[];
 };
 
 const ALLOWED_REPORT_ROLES = ["reviewer", "clinic_admin", "super_admin"];
@@ -73,6 +78,10 @@ function blankForm(encounterId: number, patientId: number, encounter?: Props["en
     final_clinical_summary: "",
     clinical_summary_overridden: false,
     notes: "",
+    report_layout: "text_only" as "text_only" | "with_investigations",
+    selected_fundus_upload_ids: [] as number[],
+    selected_ocular_investigation_ids: [] as number[],
+    attachment_captions: {} as Record<string, string>,
   };
 }
 
@@ -84,6 +93,9 @@ export default function ReportForm({
   existingReport,
   encounter,
   onReportSaved,
+  programme,
+  fundusUploads = [],
+  ocularInvestigations = [],
 }: Props) {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -134,6 +146,11 @@ export default function ReportForm({
         clinical_summary_overridden:
           Boolean(existingReport.clinical_summary_overridden),
         notes: existingReport.notes || "",
+        report_layout: existingReport.report_layout || "text_only",
+        selected_fundus_upload_ids: existingReport.selected_fundus_upload_ids || [],
+        selected_ocular_investigation_ids:
+          existingReport.selected_ocular_investigation_ids || [],
+        attachment_captions: existingReport.attachment_captions || {},
       });
 
       setSignature({
@@ -348,8 +365,12 @@ export default function ReportForm({
         <input name="report_id" value={formData.report_id} onChange={handleChange} placeholder="Report ID" className="w-full rounded border p-3" required disabled={isExisting || !isEditable} />
         <input name="review_date" type="date" value={formData.review_date} onChange={handleChange} className="w-full rounded border p-3" required disabled={!isEditable} />
 
-        <EyeSection title="Left Eye" prefix="left" data={formData} onChange={handleChange} disabled={!isEditable} />
-        <EyeSection title="Right Eye" prefix="right" data={formData} onChange={handleChange} disabled={!isEditable} />
+        {programme !== "ocular_diagnostics" ? (
+          <>
+            <EyeSection title="Left Eye" prefix="left" data={formData} onChange={handleChange} disabled={!isEditable} />
+            <EyeSection title="Right Eye" prefix="right" data={formData} onChange={handleChange} disabled={!isEditable} />
+          </>
+        ) : null}
 
         <label className="flex items-center gap-2">
           <input type="checkbox" name="ungradable" checked={formData.ungradable} onChange={handleChange} disabled={!isEditable} />
@@ -402,6 +423,71 @@ export default function ReportForm({
           />
         </label>
         <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Notes" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
+
+        <section className="rounded-lg border bg-slate-50 p-4">
+          <h3 className="font-semibold">Report Content & Attachments</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Nothing is included automatically. Select text only, or choose the exact supporting files for the PDF.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {(["text_only", "with_investigations"] as const).map((value) => (
+              <label key={value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="report_layout"
+                  checked={formData.report_layout === value}
+                  disabled={!isEditable}
+                  onChange={() =>
+                    setFormData((current) => ({
+                      ...current,
+                      report_layout: value,
+                      ...(value === "text_only"
+                        ? {
+                            selected_fundus_upload_ids: [],
+                            selected_ocular_investigation_ids: [],
+                          }
+                        : {}),
+                    }))
+                  }
+                />
+                {value === "text_only" ? "Text-only report" : "Include selected investigations"}
+              </label>
+            ))}
+          </div>
+          {formData.report_layout === "with_investigations" ? (
+            <div className="mt-4 space-y-3">
+              {fundusUploads.map((item) => (
+                <AttachmentChoice
+                  key={`fundus-${item.id}`}
+                  label={`Fundus photograph — ${item.eye_laterality}`}
+                  itemId={item.id}
+                  captionKey={`fundus:${item.id}`}
+                  selected={formData.selected_fundus_upload_ids}
+                  disabled={!isEditable}
+                  formData={formData}
+                  setFormData={setFormData}
+                  selectedField="selected_fundus_upload_ids"
+                />
+              ))}
+              {ocularInvestigations.map((item) => (
+                <AttachmentChoice
+                  key={`investigation-${item.id}`}
+                  label={`${item.investigation_type.replaceAll("_", " ")} — ${item.laterality}`}
+                  itemId={item.id}
+                  captionKey={`investigation:${item.id}`}
+                  selected={formData.selected_ocular_investigation_ids}
+                  disabled={!isEditable}
+                  formData={formData}
+                  setFormData={setFormData}
+                  selectedField="selected_ocular_investigation_ids"
+                />
+              ))}
+              {!fundusUploads.length && !ocularInvestigations.length ? (
+                <p className="text-sm text-slate-500">No supporting investigations have been uploaded.</p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
 
         {report?.id && workflowRoute === "clinic_managed" && canSubmit ? (
           <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -474,6 +560,47 @@ export default function ReportForm({
           ) : null}
         </div>
       </form>
+    </div>
+  );
+}
+
+function AttachmentChoice({ label, itemId, captionKey, selected, disabled, formData, setFormData, selectedField }: any) {
+  const checked = selected.includes(itemId);
+  return (
+    <div className="rounded border bg-white p-3">
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) =>
+            setFormData((current: any) => ({
+              ...current,
+              [selectedField]: event.target.checked
+                ? [...current[selectedField], itemId]
+                : current[selectedField].filter((id: number) => id !== itemId),
+            }))
+          }
+        />
+        {label}
+      </label>
+      {checked ? (
+        <input
+          value={formData.attachment_captions[captionKey] || ""}
+          disabled={disabled}
+          onChange={(event) =>
+            setFormData((current: any) => ({
+              ...current,
+              attachment_captions: {
+                ...current.attachment_captions,
+                [captionKey]: event.target.value,
+              },
+            }))
+          }
+          placeholder="Optional clinician caption"
+          className="mt-2 w-full rounded border p-2 text-sm"
+        />
+      ) : null}
     </div>
   );
 }
