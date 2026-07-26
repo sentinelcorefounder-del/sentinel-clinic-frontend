@@ -11,9 +11,10 @@ import {
   fetchPatientById,
   updatePatient,
   deleteImageUpload,
+  fetchOcularInvestigations,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
-import { Encounter } from "@/types/encounter";
+import { Encounter, OcularInvestigation } from "@/types/encounter";
 import { ImageUpload } from "@/types/upload";
 import { StructuredReport } from "@/types/report";
 import { ConsentRecord } from "@/types/consent";
@@ -53,6 +54,7 @@ export default function EncounterDetailPage({ params }: Props) {
   const [patient, setPatient] = useState<any>(null);
   const [uploads, setUploads] = useState<ImageUpload[]>([]);
   const [reports, setReports] = useState<StructuredReport[]>([]);
+  const [ocularInvestigations, setOcularInvestigations] = useState<OcularInvestigation[]>([]);
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
@@ -88,10 +90,11 @@ export default function EncounterDetailPage({ params }: Props) {
 
     const patientData = await fetchPatientById(String(encounterData.patient));
 
-    const [uploadData, reportData, consentData] = await Promise.all([
+    const [uploadData, reportData, consentData, investigationData] = await Promise.all([
       fetchEncounterUploads(encounterId),
       fetchEncounterReports(encounterId),
       fetchEncounterConsents(encounterId),
+      fetchOcularInvestigations(encounterId).catch(() => []),
     ]);
 
     setEncounter(encounterData);
@@ -115,6 +118,7 @@ export default function EncounterDetailPage({ params }: Props) {
     setUploads(uploadData);
     setReports(reportData);
     setConsents(consentData);
+    setOcularInvestigations(investigationData);
   }
 
   useEffect(() => {
@@ -721,6 +725,8 @@ export default function EncounterDetailPage({ params }: Props) {
               current ? { ...current, ocular_assessment: assessment } : current
             )
           }
+          fundusUploads={uploads}
+          ocularInvestigations={ocularInvestigations}
         />
       ) : null}
 
@@ -736,7 +742,6 @@ export default function EncounterDetailPage({ params }: Props) {
         />
       ) : null}
 
-      {encounter.programme !== "ocular_diagnostics" ? (
       <section className="rounded-lg border p-6">
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Optometrist Report: Diabetic Grading</h2>
@@ -754,11 +759,12 @@ export default function EncounterDetailPage({ params }: Props) {
           encounter={encounterAny}
           existingReport={reports[0] || null}
           onReportSaved={handleReportCreated}
+          programme={encounter.programme}
+          fundusUploads={uploads}
+          ocularInvestigations={ocularInvestigations}
         />
       </section>
-      ) : null}
 
-      {encounter.programme !== "ocular_diagnostics" ? (
       <section className="rounded-lg border p-6">
         <h2 className="mb-4 text-xl font-semibold">Structured Reports</h2>
 
@@ -863,7 +869,6 @@ export default function EncounterDetailPage({ params }: Props) {
           </div>
         )}
       </section>
-      ) : null}
     </main>
   );
 }

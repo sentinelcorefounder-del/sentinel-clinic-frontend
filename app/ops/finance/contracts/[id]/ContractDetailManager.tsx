@@ -31,7 +31,9 @@ export default function ContractDetailManager({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const isClinic = contract.organization_type === "clinic";
-  const supportsAI = isClinic && contract.programme !== "diabetic_screening";
+  // AI clinical review is a clinic-only price. It must remain editable even
+  // when the parent contract also covers diabetic/retinal assessment.
+  const supportsAI = isClinic;
 
   async function save(event: React.FormEvent) {
     event.preventDefault();

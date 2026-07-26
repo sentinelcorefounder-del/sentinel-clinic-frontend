@@ -72,6 +72,10 @@ export type OcularDiagnosticAssessment = {
   impression: string;
   management_plan: string;
   management_outcome: string;
+  report_layout: "text_only" | "with_investigations";
+  selected_fundus_upload_ids: number[];
+  selected_ocular_investigation_ids: number[];
+  attachment_captions: Record<string, string>;
   completed_at?: string | null;
   completed_by_display?: string;
 };

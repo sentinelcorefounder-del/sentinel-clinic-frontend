@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 
-import { updateOcularAssessment } from "@/lib/api";
-import type { OcularDiagnosticAssessment } from "@/types/encounter";
+import { getOcularAssessmentPdfUrl, updateOcularAssessment } from "@/lib/api";
+import type { OcularDiagnosticAssessment, OcularInvestigation } from "@/types/encounter";
+import type { ImageUpload } from "@/types/upload";
 
 type Props = {
   encounterId: number;
   initial: OcularDiagnosticAssessment | null | undefined;
   onSaved: (assessment: OcularDiagnosticAssessment) => void;
+  fundusUploads?: ImageUpload[];
+  ocularInvestigations?: OcularInvestigation[];
 };
 
 const emptyAssessment = {
@@ -26,12 +29,19 @@ const emptyAssessment = {
   impression: "",
   management_plan: "",
   management_outcome: "",
+  report_layout: "text_only" as "text_only" | "with_investigations",
+  selected_fundus_upload_ids: [] as number[],
+  selected_ocular_investigation_ids: [] as number[],
+  attachment_captions: {} as Record<string, string>,
+  completed_at: null as string | null,
 };
 
 export default function OcularAssessmentForm({
   encounterId,
   initial,
   onSaved,
+  fundusUploads = [],
+  ocularInvestigations = [],
 }: Props) {
   const [form, setForm] = useState({ ...emptyAssessment, ...(initial || {}) });
   const [saving, setSaving] = useState(false);
@@ -135,6 +145,88 @@ export default function OcularAssessmentForm({
         </label>
       </div>
 
+      <section className="mt-5 rounded-lg border bg-slate-50 p-4">
+        <h3 className="font-semibold">Printable Report Content</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Choose a text-only report or the exact images and investigations to add after the clinical page.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-5">
+          {(["text_only", "with_investigations"] as const).map((layout) => (
+            <label key={layout} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                checked={form.report_layout === layout}
+                onChange={() => setForm((current) => ({
+                  ...current,
+                  report_layout: layout,
+                  ...(layout === "text_only" ? {
+                    selected_fundus_upload_ids: [],
+                    selected_ocular_investigation_ids: [],
+                  } : {}),
+                }))}
+              />
+              {layout === "text_only" ? "Text only" : "Include selected investigations"}
+            </label>
+          ))}
+        </div>
+        {form.report_layout === "with_investigations" ? (
+          <div className="mt-4 space-y-3">
+            {[
+              ...fundusUploads.map((item) => ({
+                id: item.id,
+                kind: "fundus" as const,
+                label: `Fundus photograph — ${item.eye_laterality}`,
+              })),
+              ...ocularInvestigations.map((item) => ({
+                id: item.id,
+                kind: "investigation" as const,
+                label: `${item.investigation_type.replaceAll("_", " ")} — ${item.laterality}`,
+              })),
+            ].map((item) => {
+              const field = item.kind === "fundus"
+                ? "selected_fundus_upload_ids"
+                : "selected_ocular_investigation_ids";
+              const selected = form[field].includes(item.id);
+              const captionKey = `${item.kind}:${item.id}`;
+              return (
+                <div key={captionKey} className="rounded border bg-white p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        [field]: event.target.checked
+                          ? [...current[field], item.id]
+                          : current[field].filter((id) => id !== item.id),
+                      }))}
+                    />
+                    {item.label}
+                  </label>
+                  {selected ? (
+                    <input
+                      value={form.attachment_captions[captionKey] || ""}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        attachment_captions: {
+                          ...current.attachment_captions,
+                          [captionKey]: event.target.value,
+                        },
+                      }))}
+                      placeholder="Optional clinician caption"
+                      className="mt-2 w-full rounded border px-3 py-2 text-sm"
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+            {!fundusUploads.length && !ocularInvestigations.length ? (
+              <p className="text-sm text-slate-500">No supporting files have been uploaded.</p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
       <div className="mt-5 flex flex-wrap gap-3">
         <button type="button" disabled={saving} onClick={() => save(false)} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
           Save draft
@@ -142,6 +234,15 @@ export default function OcularAssessmentForm({
         <button type="button" disabled={saving} onClick={() => save(true)} className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
           Complete ocular assessment
         </button>
+        {initial?.id ? (
+          <button
+            type="button"
+            onClick={() => window.open(getOcularAssessmentPdfUrl(encounterId), "_blank", "noopener,noreferrer")}
+            className="rounded-lg border border-blue-700 px-4 py-2 font-semibold text-blue-700"
+          >
+            {form.completed_at ? "Open final PDF" : "Preview draft PDF"}
+          </button>
+        ) : null}
         {initial?.completed_at ? (
           <span className="self-center text-sm text-emerald-700">
             Completed {new Date(initial.completed_at).toLocaleString()}

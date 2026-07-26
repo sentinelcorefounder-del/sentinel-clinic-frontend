@@ -85,6 +85,10 @@ export type StructuredReport = {
   generated_clinical_summary?: string;
   final_clinical_summary?: string;
   clinical_summary_overridden?: boolean;
+  report_layout?: "text_only" | "with_investigations";
+  selected_fundus_upload_ids?: number[];
+  selected_ocular_investigation_ids?: number[];
+  attachment_captions?: Record<string, string>;
 
   distribution_status?:
     | "not_ready"

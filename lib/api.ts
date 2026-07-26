@@ -306,6 +306,10 @@ export async function updateOcularAssessment(
   return responseData;
 }
 
+export function getOcularAssessmentPdfUrl(encounterId: string | number) {
+  return `${API_URL}/encounters/${encounterId}/ocular-assessment/pdf/`;
+}
+
 export async function fetchOcularInvestigations(encounterId: string | number) {
   const res = await fetch(
     `${API_URL}/encounters/${encounterId}/ocular-investigations/`,
