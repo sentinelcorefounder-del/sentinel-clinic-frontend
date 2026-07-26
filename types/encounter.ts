@@ -6,6 +6,11 @@ export type EncounterWorkflowRoute =
   | "sentinel_managed"
   | "clinic_managed";
 
+export type AssessmentProgramme =
+  | "diabetic_screening"
+  | "ocular_diagnostics"
+  | "combined_assessment";
+
 export type ActiveHospitalReferral = {
   id: number;
   referral_id: string;
@@ -30,7 +35,7 @@ export type Encounter = {
   patient: number;
   encounter_date: string;
   encounter_type: string;
-  programme: string;
+  programme: AssessmentProgramme;
   source_type: EncounterSourceType;
   workflow_route: EncounterWorkflowRoute;
   payment_responsibility: string;
@@ -47,4 +52,102 @@ export type Encounter = {
   clinical_notes?: string;
   created_at?: string;
   updated_at?: string;
+  ocular_assessment?: OcularDiagnosticAssessment | null;
+};
+
+export type OcularDiagnosticAssessment = {
+  id: number;
+  encounter: number;
+  fundus_photography_performed: boolean;
+  visual_field_performed: boolean;
+  tonometry_performed: boolean;
+  visual_acuity_performed: boolean;
+  anterior_eye_assessment_performed: boolean;
+  presenting_complaint: string;
+  ocular_history: string;
+  anterior_eye_findings: string;
+  fundus_findings: string;
+  visual_field_summary: string;
+  tonometry_summary: string;
+  impression: string;
+  management_plan: string;
+  management_outcome: string;
+  completed_at?: string | null;
+  completed_by_display?: string;
+};
+
+export type OcularInvestigation = {
+  id: number;
+  investigation_id: string;
+  encounter: number;
+  investigation_type: string;
+  laterality: string;
+  test_type: string;
+  device_name: string;
+  performed_at?: string | null;
+  reliability: string;
+  reliability_notes: string;
+  interpretation: string;
+  file: string;
+  original_filename: string;
+  uploaded_by_display: string;
+  uploaded_at: string;
+};
+
+export type OcularAIReview = {
+  id: number;
+  review_id: string;
+  status: "pending" | "completed" | "failed";
+  provider: string;
+  fee_amount: string;
+  fee_currency: string;
+  payment_status: "pending" | "charged" | "refunded" | "free" | "free_failed";
+  model_version: string;
+  clinician_impression_snapshot: string;
+  clinician_management_snapshot: string;
+  suspected_conditions: Array<{
+    label: string;
+    certainty?: string;
+    eye?: string;
+  }>;
+  supporting_findings: string[];
+  differential_diagnoses: string[];
+  suggested_urgency: string;
+  suggested_management: string;
+  limitations: string[];
+  agreement_status: string;
+  disagreement_reasons: string[];
+  expert_review_required: boolean;
+  error_message: string;
+  clinician_decision: string;
+  clinician_decision_notes: string;
+  requested_by_display: string;
+  decided_by_display: string;
+  decided_at?: string | null;
+  requested_at: string;
+  completed_at?: string | null;
+  encounter_changed_since_review: boolean;
+  clinical_ai_consent?: number | null;
+  training_consent?: number | null;
+  consent_checked_at?: string | null;
+  privacy_verified_at?: string | null;
+  deidentified_review_reference?: string;
+  transmitted_data_manifest?: Record<string, unknown>;
+};
+
+export type OcularAIReviewList = {
+  reviews: OcularAIReview[];
+  pricing: {
+    amount: string;
+    currency: string;
+    one_review_per_encounter: boolean;
+    free_review_available: boolean;
+    amount_due: string;
+    pricing_source: "contract" | "default";
+  };
+  consent: {
+    clinical_ai_review_granted: boolean;
+    ai_training_granted: boolean;
+    ai_training_optional: boolean;
+  };
 };

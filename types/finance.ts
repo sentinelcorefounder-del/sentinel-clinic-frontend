@@ -15,6 +15,7 @@ export type PartnerContract = {
   id: number;
   organization: number;
   organization_name: string;
+  organization_type: "clinic" | "hospital" | "sentinel";
   name: string;
   programme: string;
   status: string;
@@ -24,6 +25,8 @@ export type PartnerContract = {
   payment_terms_days: number;
   credit_allowed: boolean;
   notes: string;
+  pricing_rules?: PricingRule[];
+  has_financial_history?: boolean;
 };
 
 export type PricingRule = {
@@ -42,6 +45,8 @@ export type PricingRule = {
   priority: number;
   effective_from: string;
   effective_to: string | null;
+  notes: string;
+  version: number;
 };
 
 export type LedgerEntry = {

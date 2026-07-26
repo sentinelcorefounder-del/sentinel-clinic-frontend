@@ -16,6 +16,7 @@ import type {
   ActiveReferralResponse,
   EncounterSourceType,
   EncounterWorkflowRoute,
+  AssessmentProgramme,
 } from "@/types/encounter";
 
 type PatientMode = "existing" | "new";
@@ -66,6 +67,8 @@ export default function NewRetinalAssessmentPage() {
   const [overrideReason, setOverrideReason] = useState("");
   const [workflowRoute, setWorkflowRoute] =
     useState<EncounterWorkflowRoute>("clinic_managed");
+  const [programme, setProgramme] =
+    useState<AssessmentProgramme>("diabetic_screening");
 
   const [assessmentDate, setAssessmentDate] = useState(today());
   const [diabetesDuration, setDiabetesDuration] = useState("");
@@ -165,6 +168,14 @@ export default function NewRetinalAssessmentPage() {
     checkReferrals();
   }, [mode, selectedPatientId]);
 
+  useEffect(() => {
+    if (programme === "ocular_diagnostics") {
+      setSourceType("clinic_direct");
+      setSelectedReferralId("");
+      setOverrideReason("");
+    }
+  }, [programme]);
+
   function updateNewPatient(
     field: keyof NewPatientForm,
     value: string
@@ -202,6 +213,7 @@ export default function NewRetinalAssessmentPage() {
       }
 
       if (
+        programme !== "ocular_diagnostics" &&
         sourceType === "hospital_referral" &&
         !selectedReferralId
       ) {
@@ -211,6 +223,7 @@ export default function NewRetinalAssessmentPage() {
       }
 
       if (
+        programme !== "ocular_diagnostics" &&
         sourceType === "clinic_direct" &&
         activeReferrals.length > 0 &&
         !overrideReason.trim()
@@ -220,8 +233,10 @@ export default function NewRetinalAssessmentPage() {
         );
       }
 
+      const effectiveSource: EncounterSourceType =
+        programme === "ocular_diagnostics" ? "clinic_direct" : sourceType;
       const route: EncounterWorkflowRoute =
-        sourceType === "hospital_referral"
+        effectiveSource === "hospital_referral"
           ? "sentinel_managed"
           : profile.workflow_mode === "hybrid"
             ? workflowRoute
@@ -233,20 +248,26 @@ export default function NewRetinalAssessmentPage() {
         encounter_id: encounterId(),
         patient: Number(patientId),
         encounter_date: assessmentDate,
-        encounter_type: "retinal_assessment",
-        programme: "diabetic_screening",
-        source_type: sourceType,
+        encounter_type:
+          programme === "ocular_diagnostics"
+            ? "ocular_assessment"
+            : programme === "combined_assessment"
+              ? "combined_assessment"
+              : "retinal_assessment",
+        programme,
+        source_type: effectiveSource,
         hospital_referral:
-          sourceType === "hospital_referral"
+          effectiveSource === "hospital_referral"
             ? Number(selectedReferralId)
             : null,
         source_override_reason:
-          sourceType === "clinic_direct"
+          effectiveSource === "clinic_direct" &&
+          programme !== "ocular_diagnostics"
             ? overrideReason.trim()
             : "",
         workflow_route: route,
         payment_responsibility:
-          sourceType === "hospital_referral"
+          effectiveSource === "hospital_referral"
             ? "hospital"
             : profile.default_payment_responsibility,
         diabetes_duration: diabetesDuration,
@@ -272,10 +293,10 @@ export default function NewRetinalAssessmentPage() {
     <main className="sentinel-page max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">
-          New Diabetic Retinal Assessment
+          New Clinical Assessment
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Select the patient and the exact source of today&apos;s
+          Choose the clinical pathway, patient and source for today&apos;s
           assessment.
         </p>
       </div>
@@ -285,6 +306,44 @@ export default function NewRetinalAssessmentPage() {
           {error}
         </div>
       ) : null}
+
+      <section className="rounded-2xl border bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold">Assessment type</h2>
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            ["diabetic_screening", "Diabetic Retinal Assessment", "Sentinel diabetic grading and report workflow."],
+            ["ocular_diagnostics", "General Ocular Assessment", "Clinic-owned assessment for non-diabetic ocular care."],
+            ["combined_assessment", "Combined Assessment", "Diabetic screening plus a separate ocular clinical record."],
+          ].map(([value, title, description]) => {
+            const disabled =
+              value !== "diabetic_screening" &&
+              !profile?.ocular_diagnostics_enabled;
+            return (
+              <button
+                key={value}
+                type="button"
+                disabled={disabled}
+                onClick={() => setProgramme(value as AssessmentProgramme)}
+                className={`rounded-xl border p-4 text-left ${
+                  programme === value
+                    ? "border-blue-700 bg-blue-50"
+                    : "bg-white"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                <span className="block font-semibold">{title}</span>
+                <span className="mt-1 block text-sm text-slate-600">
+                  {description}
+                </span>
+                {disabled ? (
+                  <span className="mt-2 block text-xs text-amber-700">
+                    Ask Sentinel Ops to enable ocular diagnostics for this clinic.
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">1. Patient</h2>
@@ -385,7 +444,9 @@ export default function NewRetinalAssessmentPage() {
         )}
       </section>
 
-      {mode === "existing" && selectedPatientId ? (
+      {programme !== "ocular_diagnostics" &&
+      mode === "existing" &&
+      selectedPatientId ? (
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">
             2. Assessment Pathway
@@ -481,7 +542,7 @@ export default function NewRetinalAssessmentPage() {
           3. Assessment Setup
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
-          <label>
+          {programme !== "ocular_diagnostics" ? <label>
             <span className="mb-1 block text-sm font-medium">
               Assessment date
             </span>
@@ -493,7 +554,7 @@ export default function NewRetinalAssessmentPage() {
               }
               className="w-full rounded-xl border p-3"
             />
-          </label>
+          </label> : null}
           <label>
             <span className="mb-1 block text-sm font-medium">
               Diabetes duration
@@ -508,7 +569,12 @@ export default function NewRetinalAssessmentPage() {
           </label>
         </div>
 
-        {sourceType === "hospital_referral" ? (
+        {programme === "ocular_diagnostics" ? (
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+            This clinic-owned episode stays outside the hospital diabetic
+            referral and Sentinel Ops diabetic grading queues.
+          </div>
+        ) : sourceType === "hospital_referral" ? (
           <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm">
             Hospital referrals use Sentinel Managed workflow.
           </div>

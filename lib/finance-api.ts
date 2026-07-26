@@ -52,14 +52,14 @@ export async function initializeWalletTopUp(input: {
   return parseResponse(res);
 }
 
-export async function financeWrite(path: string, method: "POST" | "PATCH", body: unknown) {
+export async function financeWrite(path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) {
   await ensureCsrf();
   const csrfToken = getCookie("csrftoken") || "";
   const res = await fetch(`${API_URL}${path}`, {
     method,
     credentials: "include",
     headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   return parseResponse(res);
 }

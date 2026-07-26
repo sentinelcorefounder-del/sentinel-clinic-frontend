@@ -1,15 +1,245 @@
 "use client";
-import { useState } from "react";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { financeWrite } from "@/lib/finance-api";
 import type { PartnerContract, PricingRule } from "@/types/finance";
 
-type Org = { id: number; name: string; organization_type: string; clinic_id: string };
-export default function ContractManager({ organizations, contracts, rules }: { organizations: Org[]; contracts: PartnerContract[]; rules: PricingRule[] }) {
-  const [message, setMessage] = useState(""); const [error, setError] = useState("");
-  const [form, setForm] = useState({ organization: "", name: "Retinal Assessment Agreement", gross_amount: "15000", effective_from: new Date().toISOString().slice(0,10), payment_responsibility: "hospital", equipment_owner_type: "sentinel" });
-  async function submit(e: React.FormEvent) { e.preventDefault(); setError(""); setMessage(""); try { const contract = await financeWrite("/api/finance/contracts/", "POST", { organization: Number(form.organization), name: form.name, programme: "diabetic_screening", status: "active", currency: "NGN", effective_from: form.effective_from, payment_terms_days: 0, credit_allowed: false, notes: "" }); await financeWrite("/api/finance/pricing-rules/", "POST", { contract: contract.id, name: `${form.name} pricing`, is_active: true, service_type: "retinal_assessment", source_type: "", workflow_route: "", payment_responsibility: form.payment_responsibility, equipment_owner_type: form.equipment_owner_type, gross_amount: form.gross_amount, priority: 100, effective_from: form.effective_from, notes: "" }); setMessage("Contract and negotiated pricing rule created. Refreshing…"); window.setTimeout(() => window.location.reload(), 700); } catch (err) { setError(err instanceof Error ? err.message : "Unable to save contract."); } }
-  return <div className="space-y-8">
-    <section className="rounded-2xl border bg-white p-6 shadow-sm"><h2 className="text-xl font-bold">Create organisation agreement</h2><p className="mt-1 text-sm text-slate-600">The agreed amount is used for that hospital or clinic; it is not globally fixed.</p>{error ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}{message ? <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">{message}</p> : null}<form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-sm font-medium">Organisation<select required value={form.organization} onChange={e=>setForm({...form,organization:e.target.value})} className="mt-1 w-full rounded-xl border px-3 py-2"><option value="">Select</option>{organizations.map(o=><option key={o.id} value={o.id}>{o.name} ({o.organization_type})</option>)}</select></label><label className="text-sm font-medium">Agreement name<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="mt-1 w-full rounded-xl border px-3 py-2" /></label><label className="text-sm font-medium">Agreed charge per assessment (NGN)<input required type="number" min="0" step="0.01" value={form.gross_amount} onChange={e=>setForm({...form,gross_amount:e.target.value})} className="mt-1 w-full rounded-xl border px-3 py-2" /></label><label className="text-sm font-medium">Effective from<input required type="date" value={form.effective_from} onChange={e=>setForm({...form,effective_from:e.target.value})} className="mt-1 w-full rounded-xl border px-3 py-2" /></label><label className="text-sm font-medium">Payment responsibility<select value={form.payment_responsibility} onChange={e=>setForm({...form,payment_responsibility:e.target.value})} className="mt-1 w-full rounded-xl border px-3 py-2"><option value="hospital">Hospital</option><option value="clinic">Clinic</option><option value="patient">Patient</option><option value="programme">Programme sponsor</option></select></label><label className="text-sm font-medium">Equipment owner<select value={form.equipment_owner_type} onChange={e=>setForm({...form,equipment_owner_type:e.target.value})} className="mt-1 w-full rounded-xl border px-3 py-2"><option value="sentinel">Sentinel</option><option value="hospital">Hospital</option><option value="clinic">Clinic</option></select></label><div className="md:col-span-2"><button className="rounded-xl bg-blue-700 px-5 py-2.5 font-semibold text-white">Create agreement</button></div></form></section>
-    <section className="rounded-2xl border bg-white shadow-sm overflow-hidden"><div className="border-b p-5"><h2 className="text-xl font-bold">Existing negotiated pricing</h2></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left"><tr><th className="p-3">Organisation</th><th className="p-3">Contract</th><th className="p-3">Status</th><th className="p-3">Pricing rule</th><th className="p-3 text-right">Charge</th></tr></thead><tbody>{contracts.map(c=>{const contractRules=rules.filter(r=>r.contract===c.id); return contractRules.length ? contractRules.map((r,i)=><tr key={`${c.id}-${r.id}`} className="border-t"><td className="p-3">{i===0?c.organization_name:""}</td><td className="p-3">{i===0?c.name:""}</td><td className="p-3">{c.status}</td><td className="p-3">{r.name}</td><td className="p-3 text-right font-semibold">₦{Number(r.gross_amount).toLocaleString()}</td></tr>) : <tr key={c.id} className="border-t"><td className="p-3">{c.organization_name}</td><td className="p-3">{c.name}</td><td className="p-3">{c.status}</td><td className="p-3 text-slate-500">No pricing rule</td><td className="p-3">—</td></tr>})}</tbody></table></div></section>
-  </div>;
+type Org = {
+  id: number;
+  name: string;
+  organization_type: "clinic" | "hospital" | "sentinel";
+  clinic_id: string;
+};
+
+const today = new Date().toISOString().slice(0, 10);
+
+export default function ContractManager({
+  organizations,
+  contracts,
+  rules,
+}: {
+  organizations: Org[];
+  contracts: PartnerContract[];
+  rules: PricingRule[];
+}) {
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    organization: "",
+    name: "Retinal Assessment Agreement",
+    programme: "diabetic_screening",
+    gross_amount: "15000",
+    ai_review_amount: "4000",
+    effective_from: today,
+    payment_responsibility: "hospital",
+    equipment_owner_type: "sentinel",
+  });
+
+  const selectedOrg = useMemo(
+    () => organizations.find((organization) => String(organization.id) === form.organization),
+    [organizations, form.organization],
+  );
+  const isClinic = selectedOrg?.organization_type === "clinic";
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    try {
+      const serviceType =
+        form.programme === "ocular_diagnostics"
+          ? "ocular_assessment"
+          : form.programme === "combined_assessment"
+            ? "combined_assessment"
+            : "retinal_assessment";
+      const contract = await financeWrite("/api/finance/contracts/", "POST", {
+        organization: Number(form.organization),
+        name: form.name,
+        programme: form.programme,
+        status: "active",
+        currency: "NGN",
+        effective_from: form.effective_from,
+        payment_terms_days: 0,
+        credit_allowed: false,
+        notes: "",
+      });
+      const pricingRules = [
+        {
+          name: `${form.name} assessment pricing`,
+          service_type: serviceType,
+          source_type: "",
+          workflow_route: "",
+          payment_responsibility: form.payment_responsibility,
+          equipment_owner_type: form.equipment_owner_type,
+          gross_amount: form.gross_amount,
+          priority: 100,
+          effective_from: form.effective_from,
+          notes: "",
+        },
+      ];
+      if (isClinic && form.programme !== "diabetic_screening") {
+        pricingRules.push({
+          name: `${form.name} AI review pricing`,
+          service_type: "ocular_ai_review",
+          source_type: "",
+          workflow_route: "",
+          payment_responsibility: "clinic",
+          equipment_owner_type: "",
+          gross_amount: form.ai_review_amount,
+          priority: 100,
+          effective_from: form.effective_from,
+          notes: "Ops-approved AI Clinical Review price.",
+        });
+      }
+      await financeWrite(
+        `/api/finance/contracts/${contract.id}/revise-pricing/`,
+        "POST",
+        { pricing_rules: pricingRules },
+      );
+      setMessage("Contract created. Opening the contract details…");
+      window.setTimeout(
+        () => window.location.assign(`/ops/finance/contracts/${contract.id}`),
+        500,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save contract.");
+    }
+  }
+
+  function selectOrganization(value: string) {
+    const organization = organizations.find((item) => String(item.id) === value);
+    setForm({
+      ...form,
+      organization: value,
+      payment_responsibility:
+        organization?.organization_type === "hospital" ? "hospital" : "clinic",
+    });
+  }
+
+  return (
+    <div className="space-y-8">
+      <section className="rounded-2xl border bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold">Create organisation agreement</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          An overlapping active contract for the same organisation and programme will be rejected.
+        </p>
+        {error ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+        {message ? <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">{message}</p> : null}
+        <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
+          <label className="text-sm font-medium">
+            Organisation
+            <select required value={form.organization} onChange={(event) => selectOrganization(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2">
+              <option value="">Select</option>
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name} ({organization.organization_type})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Programme
+            <select value={form.programme} onChange={(event) => setForm({ ...form, programme: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2">
+              <option value="diabetic_screening">Diabetic screening</option>
+              <option value="ocular_diagnostics">Ocular diagnostics</option>
+              <option value="combined_assessment">Combined assessment</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Agreement name
+            <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" />
+          </label>
+          <label className="text-sm font-medium">
+            Assessment charge (NGN)
+            <input required type="number" min="0" step="0.01" value={form.gross_amount} onChange={(event) => setForm({ ...form, gross_amount: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" />
+          </label>
+          {isClinic && form.programme !== "diabetic_screening" ? (
+            <label className="text-sm font-medium">
+              AI clinical-review charge (NGN)
+              <input required type="number" min="0" step="0.01" value={form.ai_review_amount} onChange={(event) => setForm({ ...form, ai_review_amount: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" />
+            </label>
+          ) : null}
+          <label className="text-sm font-medium">
+            Effective from
+            <input required type="date" value={form.effective_from} onChange={(event) => setForm({ ...form, effective_from: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" />
+          </label>
+          <label className="text-sm font-medium">
+            Payment responsibility
+            <select value={form.payment_responsibility} onChange={(event) => setForm({ ...form, payment_responsibility: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2">
+              <option value="hospital">Hospital</option>
+              <option value="clinic">Clinic</option>
+              <option value="patient">Patient</option>
+              <option value="programme">Programme sponsor</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Equipment owner
+            <select value={form.equipment_owner_type} onChange={(event) => setForm({ ...form, equipment_owner_type: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2">
+              <option value="sentinel">Sentinel</option>
+              <option value="hospital">Hospital</option>
+              <option value="clinic">Clinic</option>
+            </select>
+          </label>
+          <div className="md:col-span-2">
+            <button className="rounded-xl bg-blue-700 px-5 py-2.5 font-semibold text-white">
+              Create agreement
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="border-b p-5">
+          <h2 className="text-xl font-bold">Existing contracts</h2>
+          <p className="mt-1 text-sm text-slate-600">Open a row to edit pricing, suspend, end, or review its history.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left">
+              <tr>
+                <th className="p-3">Organisation</th>
+                <th className="p-3">Contract</th>
+                <th className="p-3">Programme</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Prices</th>
+                <th className="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {contracts.map((contract) => {
+                const contractRules = rules.filter((rule) => rule.contract === contract.id && rule.is_active);
+                const current =
+                  contract.status === "active" &&
+                  contract.effective_from <= today &&
+                  (!contract.effective_to || contract.effective_to >= today);
+                return (
+                  <tr key={contract.id} className="border-t">
+                    <td className="p-3">{contract.organization_name}</td>
+                    <td className="p-3 font-medium">{contract.name}</td>
+                    <td className="p-3">{contract.programme.replaceAll("_", " ")}</td>
+                    <td className="p-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${current ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>
+                        {current ? "Current" : contract.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      {contractRules.map((rule) => (
+                        <div key={rule.id}>{rule.service_type.replaceAll("_", " ")}: ₦{Number(rule.gross_amount).toLocaleString()}</div>
+                      ))}
+                    </td>
+                    <td className="p-3 text-right">
+                      <Link href={`/ops/finance/contracts/${contract.id}`} className="font-semibold text-blue-700 hover:underline">
+                        Open
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }
