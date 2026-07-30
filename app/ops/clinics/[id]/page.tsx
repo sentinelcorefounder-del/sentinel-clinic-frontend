@@ -2,6 +2,7 @@
 
 import OrganizationFinanceCard from "@/components/OrganizationFinanceCard";
 import OrganizationBrandingEditor from "@/components/OrganizationBrandingEditor";
+import OrganizationBranchManager from "@/components/OrganizationBranchManager";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -242,6 +243,7 @@ export default function OpsClinicDetailPage() {
         organization={clinic}
         onSaved={() => loadClinic()}
       />
+      <OrganizationBranchManager organizationId={clinic.id} />
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="mb-5">
