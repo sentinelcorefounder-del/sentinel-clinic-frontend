@@ -2,6 +2,7 @@
 
 import OrganizationFinanceCard from "@/components/OrganizationFinanceCard";
 import OrganizationBrandingEditor from "@/components/OrganizationBrandingEditor";
+import OrganizationBranchManager from "@/components/OrganizationBranchManager";
 import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -151,6 +152,9 @@ export default function OpsHospitalDetailPage({ params }: Props) {
         organization={hospital}
         onSaved={(updated) => setHospital(updated)}
       />
+      <div className="mb-6">
+        <OrganizationBranchManager organizationId={hospital.id} />
+      </div>
 
       {message ? (
         <div
