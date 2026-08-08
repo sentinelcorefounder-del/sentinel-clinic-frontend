@@ -458,6 +458,63 @@ export async function createImageUpload(formData: FormData) {
   return res.json();
 }
 
+export async function createMobileTransfer(encounterId: number) {
+  const res = await fetch(`${API_URL}/uploads/mobile-transfer/encounter/${encounterId}/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify({}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to start mobile transfer."));
+  return data;
+}
+
+export async function fetchMobileTransfer(sessionId: string) {
+  const res = await fetch(`${API_URL}/uploads/mobile-transfer/${sessionId}/`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to check mobile transfer."));
+  return data;
+}
+
+export async function reviewMobileTransferImage(
+  sessionId: string,
+  imageId: number,
+  data: Record<string, unknown>,
+) {
+  const res = await fetch(`${API_URL}/uploads/mobile-transfer/${sessionId}/images/${imageId}/review/`, {
+    method: "POST",
+    credentials: "include",
+    headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to review image."));
+  return responseData;
+}
+
+export async function fetchPublicMobileTransfer(token: string) {
+  const res = await fetch(`${API_URL}/uploads/mobile-transfer/public/${encodeURIComponent(token)}/`, {
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "This transfer link is unavailable."));
+  return data;
+}
+
+export async function uploadPublicMobileTransfer(token: string, formData: FormData) {
+  const res = await fetch(`${API_URL}/uploads/mobile-transfer/public/${encodeURIComponent(token)}/`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Image transfer failed."));
+  return data;
+}
+
 export async function deleteImageUpload(uploadId: string | number) {
   const res = await fetch(`${API_URL}/uploads/${uploadId}/`, {
     method: "DELETE",

@@ -23,6 +23,7 @@ import ReportForm from "@/components/ReportForm";
 import ConsentForm from "@/components/ConsentForm";
 import OcularAssessmentForm from "@/components/OcularAssessmentForm";
 import OcularInvestigationsAIReview from "@/components/OcularInvestigationsAIReview";
+import RemidioMobileTransfer from "@/components/RemidioMobileTransfer";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -553,6 +554,11 @@ export default function EncounterDetailPage({ params }: Props) {
         patientId={encounter.patient}
         existingUploads={uploads}
         onUploadSuccess={handleImageUploaded}
+      />
+
+      <RemidioMobileTransfer
+        encounterId={encounter.id}
+        onConfirmed={handleImageUploaded}
       />
 
       <section className="rounded-lg border p-6">
