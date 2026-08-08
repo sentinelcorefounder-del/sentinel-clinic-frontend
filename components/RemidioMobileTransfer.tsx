@@ -6,6 +6,7 @@ import {
   createMobileTransfer,
   fetchMobileTransfer,
   reviewMobileTransferImage,
+  uploadPublicMobileTransfer,
 } from "@/lib/api";
 
 type PendingImage = {
@@ -24,6 +25,7 @@ export default function RemidioMobileTransfer({ encounterId, onConfirmed }: Prop
   const [session, setSession] = useState<any>(null);
   const [images, setImages] = useState<PendingImage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [desktopFiles, setDesktopFiles] = useState<File[]>([]);
   const [message, setMessage] = useState("");
   const [reviews, setReviews] = useState<Record<number, { eye: string; quality: string }>>({});
 
@@ -61,6 +63,33 @@ export default function RemidioMobileTransfer({ encounterId, onConfirmed }: Prop
     }
   }
 
+  async function uploadDownloadedFiles() {
+    if (!desktopFiles.length) {
+      setMessage("Select at least one image downloaded from Remidio Connect.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+    try {
+      const activeSession = session || await createMobileTransfer(encounterId);
+      if (!session) setSession(activeSession);
+
+      const formData = new FormData();
+      desktopFiles.forEach((file) => formData.append("images", file));
+      await uploadPublicMobileTransfer(activeSession.token, formData);
+
+      const data = await fetchMobileTransfer(activeSession.session_id);
+      setImages(data.images || []);
+      setDesktopFiles([]);
+      setMessage("Images received. Verify the patient, eye and image quality before attaching them.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not import the downloaded images.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function review(image: PendingImage, action: "confirm" | "reject") {
     const choice = reviews[image.id] || { eye: "left", quality: "good" };
     setBusy(true);
@@ -87,15 +116,43 @@ export default function RemidioMobileTransfer({ encounterId, onConfirmed }: Prop
   return (
     <section className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
       <div>
-        <h2 className="text-xl font-semibold">Import from Remidio iPhone</h2>
+        <h2 className="text-xl font-semibold">Import from Remidio</h2>
         <p className="mt-1 text-sm text-slate-700">
-          Start a secure 10-minute transfer, scan the QR code on the iPhone, then review each image before attaching it.
+          Download the patient images from Remidio Connect on this computer, then import them here for verification. The QR transfer remains available as a fallback for compatible phones.
         </p>
       </div>
-      {!session ? (
-        <button type="button" onClick={startTransfer} disabled={busy} className="rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white disabled:opacity-50">
-          {busy ? "Starting..." : "Start camera transfer"}
+      <div className="space-y-3 rounded bg-white p-4">
+        <div>
+          <h3 className="font-semibold">Upload from Remidio Connect</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Confirm that the files belong to the patient shown in this encounter. They will remain pending until you select the correct eye and attach them.
+          </p>
+        </div>
+        <input
+          type="file"
+          accept="image/jpeg,image/png"
+          multiple
+          disabled={busy}
+          onChange={(event) => setDesktopFiles(Array.from(event.target.files || []))}
+          className="block w-full rounded border p-3 text-sm"
+        />
+        <button
+          type="button"
+          onClick={uploadDownloadedFiles}
+          disabled={busy || !desktopFiles.length}
+          className="rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white disabled:opacity-50"
+        >
+          {busy ? "Uploading..." : "Import downloaded images"}
         </button>
+      </div>
+      {!session ? (
+        <details className="rounded border border-blue-200 bg-white p-4">
+          <summary className="cursor-pointer font-semibold">QR transfer fallback</summary>
+          <p className="mt-2 text-sm text-slate-600">Use this only with a phone that can open the Sentinel upload page.</p>
+          <button type="button" onClick={startTransfer} disabled={busy} className="mt-3 rounded border border-blue-300 px-4 py-3 font-semibold text-blue-800 disabled:opacity-50">
+            {busy ? "Starting..." : "Generate phone QR code"}
+          </button>
+        </details>
       ) : (
         <>
           <div className="flex flex-col gap-4 rounded bg-white p-4 md:flex-row md:items-center">
@@ -104,7 +161,7 @@ export default function RemidioMobileTransfer({ encounterId, onConfirmed }: Prop
               <p><strong>Patient:</strong> {session.patient_display}</p>
               <p><strong>Date of birth:</strong> {session.patient_date_of_birth}</p>
               <p><strong>Encounter:</strong> {session.encounter_id}</p>
-              <p className="mt-2">Scan this code with the Remidio iPhone camera. The QR code contains only a secure one-time token.</p>
+              <p className="mt-2">Scan this only with a compatible phone that can open a web page. The QR code contains only a secure one-time token.</p>
               <button type="button" onClick={startTransfer} disabled={busy} className="mt-3 rounded border px-3 py-2">Generate a new code</button>
             </div>
           </div>
