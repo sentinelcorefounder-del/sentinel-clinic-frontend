@@ -75,3 +75,18 @@ export async function financeWriteForm(path: string, body: FormData) {
   });
   return parseResponse(res);
 }
+
+export async function downloadFinancePdf(path: string, filename: string) {
+  const res = await fetch(`${API_URL}${path}`, { credentials: "include", cache: "no-store" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.detail || "Unable to download the document.");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}

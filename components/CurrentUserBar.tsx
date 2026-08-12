@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
 import OpsNotificationBell from "@/components/OpsNotificationBell";
+import PartnerNotificationBell from "@/components/PartnerNotificationBell";
 
 function canAccessOps(user: CurrentUser | null) {
   if (!user) return false;
@@ -218,6 +219,7 @@ export default function CurrentUserBar() {
 
         <div className="flex items-center gap-4">
           {!loading && isOps && mode === "ops" ? <OpsNotificationBell /> : null}
+          {!loading && user && mode !== "ops" ? <PartnerNotificationBell /> : null}
 
           {!loading && !user ? (
             <Link

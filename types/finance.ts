@@ -137,4 +137,35 @@ export type BankTransferFunding = {
   bank_transaction_reference: string;
   value_date: string | null;
   created_at: string;
+  receipt_reference: string | null;
+  billing_snapshot: {
+    legal_entity_name?: string;
+    trading_name?: string;
+    bank_name?: string;
+    bank_account_name?: string;
+    bank_account_number?: string;
+    bank_branch_code?: string;
+    transfer_instructions?: string;
+  };
+};
+
+export type BillingProfile = {
+  id: number;
+  legal_entity_name: string;
+  trading_name: string;
+  registered_address: string;
+  company_registration_number: string;
+  tax_identification_number: string;
+  finance_email: string;
+  finance_phone: string;
+  bank_name: string;
+  bank_account_name: string;
+  bank_account_number: string;
+  bank_branch_code: string;
+  currency: string;
+  transfer_instructions: string;
+  funding_request_prefix: string;
+  receipt_prefix: string;
+  is_active: boolean;
+  is_complete: boolean;
 };
