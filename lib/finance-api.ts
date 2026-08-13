@@ -1,13 +1,13 @@
 import { ensureCsrf, getCookie } from "@/lib/auth";
 import type { BankTransferFunding, PartnerFinance } from "@/types/finance";
+import { financeErrorMessage } from "@/lib/finance-error";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 async function parseResponse(res: Response) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const detail = Array.isArray(data?.detail) ? data.detail.join(" ") : data?.detail;
-    throw new Error(detail || `Finance request failed (${res.status})`);
+    throw new Error(financeErrorMessage(data, res.status));
   }
   return data;
 }
