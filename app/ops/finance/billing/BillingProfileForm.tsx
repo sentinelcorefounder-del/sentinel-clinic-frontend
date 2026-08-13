@@ -14,6 +14,7 @@ const empty: Omit<BillingProfile, "id" | "is_complete"> = {
 
 export default function BillingProfileForm({ initial }: { initial: BillingProfile | null }) {
   const [form, setForm] = useState(initial || empty);
+  const [savedProfile, setSavedProfile] = useState<BillingProfile | null>(initial);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -21,8 +22,10 @@ export default function BillingProfileForm({ initial }: { initial: BillingProfil
   async function save(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(""); setMessage("");
     try {
-      const path = initial ? `/api/finance/billing-profile/${initial.id}/` : "/api/finance/billing-profile/";
-      await financeWrite(path, initial ? "PATCH" : "POST", form);
+      const path = savedProfile ? `/api/finance/billing-profile/${savedProfile.id}/` : "/api/finance/billing-profile/";
+      const saved = await financeWrite(path, savedProfile ? "PATCH" : "POST", form) as BillingProfile;
+      setSavedProfile(saved);
+      setForm(saved);
       setMessage("Billing and bank settings saved. New funding requests will use these details.");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to save settings."); }
     finally { setBusy(false); }
