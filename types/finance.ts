@@ -102,13 +102,55 @@ export type FinanceDashboardSummary = {
 export type FinanceCapabilities = {
   can_view: boolean;
   can_operate: boolean;
+  can_verify: boolean;
   can_approve: boolean;
   can_administer: boolean;
   can_request_corrections: boolean;
   can_decide_corrections: boolean;
   can_prepare_settlements: boolean;
   can_approve_settlements: boolean;
+  can_mark_settlements_paid: boolean;
   can_configure_pricing: boolean;
+  internal_finance: {
+    can_administer: boolean;
+    can_operate: boolean;
+    can_approve: boolean;
+    can_manage_service_partners: boolean;
+    can_manage_service_sessions: boolean;
+  };
+};
+
+export type ServicePartner = {
+  id: number;
+  clinic_id: string;
+  name: string;
+  contact_email: string;
+  address: string;
+  phone: string;
+  currency: string;
+  is_active: boolean;
+};
+
+export type AssessmentServiceSession = {
+  id: number;
+  session_reference: string;
+  service_date: string;
+  location_type: "mobile" | "hospital" | "clinic";
+  participating_organization: number;
+  participating_organization_name: string;
+  service_branch: number | null;
+  service_branch_name: string | null;
+  provider_type: "sentinel" | "service_partner";
+  service_partner: number | null;
+  service_partner_name: string | null;
+  sentinel_arranged_transport: boolean;
+  camera_team_rate: string;
+  logistics_allocation_rate: string;
+  currency: string;
+  status: "draft" | "active" | "completed" | "cancelled";
+  notes: string;
+  configuration_version: number;
+  linked_encounter_count: number;
 };
 
 export type FinanceActionRequest = {
@@ -124,6 +166,19 @@ export type FinanceActionRequest = {
   decided_by_username: string | null;
   decision_reason: string;
   created_at: string;
+  evidence_available: boolean;
+};
+
+export type SettlementBatch = {
+  id: number;
+  beneficiary_organization_name: string;
+  period_start: string;
+  period_end: string;
+  status: string;
+  total_amount: string;
+  currency: string;
+  external_reference: string;
+  payment_evidence_available: boolean;
 };
 
 export type BankTransferFunding = {
@@ -138,6 +193,7 @@ export type BankTransferFunding = {
   value_date: string | null;
   created_at: string;
   receipt_reference: string | null;
+  proof_available: boolean;
   billing_snapshot: {
     legal_entity_name?: string;
     trading_name?: string;

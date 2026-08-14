@@ -76,17 +76,40 @@ export async function financeWriteForm(path: string, body: FormData) {
   return parseResponse(res);
 }
 
-export async function downloadFinancePdf(path: string, filename: string) {
+function safeDownloadFilename(value: string | null, fallback: string) {
+  const candidate = (value || "").split(/[\\/]/).pop()?.replace(/[^A-Za-z0-9._ -]/g, "_").trim();
+  return candidate && candidate !== "." && candidate !== ".." ? candidate : fallback;
+}
+
+function responseFilename(res: Response, fallback: string) {
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const quoted = disposition.match(/filename="([^"]+)"/i)?.[1];
+  const plain = disposition.match(/filename=([^;]+)/i)?.[1]?.trim();
+  let supplied = encoded || quoted || plain || "";
+  try { supplied = decodeURIComponent(supplied); } catch { supplied = ""; }
+  return safeDownloadFilename(supplied, fallback);
+}
+
+export async function downloadFinanceFile(path: string, fallbackFilename: string) {
   const res = await fetch(`${API_URL}${path}`, { credentials: "include", cache: "no-store" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data?.detail || "Unable to download the document.");
+    throw new Error(financeErrorMessage(data, res.status));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = responseFilename(res, safeDownloadFilename(fallbackFilename, "finance-evidence"));
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export async function downloadFinancePdf(path: string, filename: string) {
+  return downloadFinanceFile(path, filename);
 }

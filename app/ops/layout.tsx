@@ -3,7 +3,13 @@ import { redirect } from "next/navigation";
 import { serverFetch } from "@/lib/server-api";
 import OpsGlobalSearch from "@/components/OpsGlobalSearch";
 
-function canAccessOps(user: any) {
+type OpsUser = {
+  is_superuser?: boolean;
+  roles?: string[];
+  organization?: { organization_type?: string } | null;
+};
+
+function canAccessOps(user: OpsUser | null) {
   const roles = user?.roles || [];
   return user?.is_superuser || [
     "ops_admin", "sentinel_ops", "finance_viewer", "finance_operator",
@@ -48,6 +54,7 @@ const navSections = [
       ["Corrections", "/ops/finance/corrections"],
       ["Reconciliation", "/ops/finance/reconciliation"],
       ["Finance audit", "/ops/finance/audit"],
+      ["Internal finance foundation", "/ops/finance/internal/sessions"],
     ],
   },
   {
@@ -65,13 +72,21 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
   try { user = await serverFetch("/api/auth/me/"); } catch { redirect("/login"); }
   if (!canAccessOps(user)) redirect("/");
   const roles = user?.roles || [];
+  const canAccessInternalFinance = user?.is_internal_sentinel_staff === true &&
+    roles.includes("finance_admin");
   const isCoreOps = user?.is_superuser || roles.includes("ops_admin") || roles.includes("sentinel_ops");
-  const visibleSections = isCoreOps
+  const roleSections = isCoreOps
     ? navSections
     : navSections.filter((section) => section.title === "Organisations & Finance").map((section) => ({
         ...section,
         links: section.links.filter(([, href]) => href.startsWith("/ops/finance")),
       }));
+  const visibleSections = roleSections.map((section) => ({
+    ...section,
+    links: section.links.filter(([, href]) =>
+      href !== "/ops/finance/internal/sessions" || canAccessInternalFinance
+    ),
+  }));
 
   return (
     <div className="min-h-screen bg-slate-100">
