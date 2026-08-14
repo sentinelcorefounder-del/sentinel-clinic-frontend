@@ -1,8 +1,11 @@
 import { serverFetch } from "@/lib/server-api";
 import InternalFinanceFoundationManager from "./InternalFinanceFoundationManager";
 import type { AssessmentServiceSession, ServicePartner } from "@/types/finance";
+import { redirect } from "next/navigation";
 
 export default async function InternalFinanceSessionsPage() {
+  const user = await serverFetch("/api/auth/me/");
+  if (!user?.roles?.includes("finance_admin")) redirect("/ops/finance/internal/payables");
   const [sessions, partners, organizations] = await Promise.all([
     serverFetch("/api/finance/internal/service-sessions/"),
     serverFetch("/api/finance/internal/service-partners/"),

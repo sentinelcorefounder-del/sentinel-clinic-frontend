@@ -99,6 +99,43 @@ export type FinanceDashboardSummary = {
   settlements: Record<string, string>;
 };
 
+export type ServicePartnerEarning = {
+  id: number; earning_reference: string; service_partner: number; service_partner_name: string;
+  encounter_reference: string; service_session: number; session_reference: string;
+  assessment_date: string; provider_type: string; amount: string; currency: string;
+  earned_at: string; status: string; settlement_id: number | null;
+};
+
+export type ServicePartnerPayableSummary = {
+  service_partner_id: number; service_partner__name: string; currency: string;
+  total_earned: string; total_paid: string | null; outstanding: string | null;
+  total_adjustments: string; carried_forward_adjustment: string;
+  unpaid_assessments: number; oldest_outstanding_date: string | null;
+};
+
+export type ServicePartnerAdjustment = {
+  id: number; earning_reference: string; service_partner: number; service_partner_name: string;
+  amount: string; currency: string; reason: string; status: string;
+  active_settlement: number | null; posted_at: string; applied_at: string | null;
+};
+
+export type ServicePartnerCorrection = {
+  id: number; earning: number; earning_reference: string; amount: string; reason: string;
+  status: string; requested_by_name: string; decided_by_name: string | null;
+  decided_at: string | null; decision_reason: string;
+  adjustment: ServicePartnerAdjustment | null; created_at: string;
+};
+
+export type ServicePartnerSettlement = {
+  id: number; service_partner: number; service_partner_name: string; assessment_date: string;
+  currency: string; status: string; assessment_count: number; gross_amount: string;
+  final_amount: string; included_sessions: string[];
+  rate_breakdown: Array<{ rate: string; currency: string; count: number }>;
+  prepared_by_name: string; approved_by_name: string | null; paid_by_name: string | null;
+  approved_at: string | null; paid_at: string | null; payment_date: string | null;
+  external_reference: string; has_payment_evidence: boolean;
+};
+
 export type FinanceCapabilities = {
   can_view: boolean;
   can_operate: boolean;
