@@ -5,7 +5,7 @@ export type UserOrganization = {
   id: number;
   name: string;
   clinic_id: string;
-  organization_type: "clinic" | "hospital" | "sentinel";
+  organization_type: "clinic" | "hospital" | "sentinel" | "service_partner";
   contact_email: string;
   is_active: boolean;
 };
@@ -16,6 +16,7 @@ export type CurrentUser = {
   email: string;
   is_staff: boolean;
   is_superuser: boolean;
+  is_internal_sentinel_staff: boolean;
   must_change_password: boolean;
   roles: string[];
   organization: UserOrganization | null;

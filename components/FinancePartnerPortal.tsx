@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { downloadFinancePdf, fetchMyBankTransfers, fetchMyFinance, financeWrite, financeWriteForm, initializeWalletTopUp } from "@/lib/finance-api";
+import { downloadFinanceFile, downloadFinancePdf, fetchMyBankTransfers, fetchMyFinance, financeWrite, financeWriteForm, initializeWalletTopUp } from "@/lib/finance-api";
 import { getMe } from "@/lib/auth";
 import type { BankTransferFunding, PartnerFinance } from "@/types/finance";
 
@@ -79,6 +79,18 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
     }
   }
 
+  async function downloadProof(item: BankTransferFunding) {
+    setError("");
+    try {
+      await downloadFinanceFile(
+        `/api/finance/bank-transfer-funding/${item.id}/proof-download/`,
+        `${item.request_reference}-proof`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to download transfer proof.");
+    }
+  }
+
   if (loading) return <main className="min-h-screen bg-slate-100 p-10"><p>Loading finance portal...</p></main>;
   if (error && !finance) return <main className="min-h-screen bg-slate-100 p-10"><p className="text-red-700">{error}</p></main>;
   if (!finance) return null;
@@ -131,7 +143,7 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
         <h2 className="text-xl font-bold">Fund by bank transfer</h2>
         <p className="mt-1 text-sm text-slate-600">Create a funding reference, make the transfer using Sentinel&apos;s confirmed bank instructions, then upload evidence. Your wallet is credited only after separate verification and approval.</p>
         {finance.wallet ? <form onSubmit={requestBankTransfer} className="mt-5 grid gap-3 md:grid-cols-3"><input required name="requested_amount" type="number" min="1000" step="100" placeholder="Requested amount (NGN)" className="rounded-xl border px-3 py-2"/><input name="notes" placeholder="Payment note (optional)" className="rounded-xl border px-3 py-2"/><button disabled={submitting} className="rounded-xl bg-slate-900 px-4 py-2 font-semibold text-white">Create transfer request</button></form> : null}
-        <div className="mt-5 overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left"><tr><th className="p-3">Reference</th><th className="p-3">Amount</th><th className="p-3">Status</th><th className="p-3">Documents</th><th className="p-3">Evidence</th></tr></thead><tbody>{bankTransfers.length?bankTransfers.map(item=><tr key={item.id} className="border-t align-top"><td className="p-3"><span className="font-mono text-xs">{item.request_reference}</span>{item.status==="awaiting_transfer"&&item.billing_snapshot?.bank_account_number?<div className="mt-2 text-xs text-slate-600"><div>{item.billing_snapshot.bank_name}</div><div>{item.billing_snapshot.bank_account_name}</div><div className="font-semibold">{item.billing_snapshot.bank_account_number}</div><div>Use reference: <strong>{item.request_reference}</strong></div></div>:null}</td><td className="p-3">{money(item.requested_amount,item.currency)}</td><td className="p-3">{label(item.status)}</td><td className="p-3"><div className="flex flex-col items-start gap-2"><button type="button" onClick={()=>downloadDocument(item)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold">Download proforma invoice</button>{item.status==="credited"?<button type="button" onClick={()=>downloadDocument(item,true)} className="rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800">Receipt</button>:null}</div></td><td className="p-3">{item.status==="awaiting_transfer"?<label className="cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold">Upload proof<input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={e=>uploadProof(item.id,e.target.files?.[0]||null)}/></label>:"Submitted"}</td></tr>):<tr><td colSpan={5} className="p-6 text-center text-slate-500">No bank-transfer requests.</td></tr>}</tbody></table></div>
+        <div className="mt-5 overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left"><tr><th className="p-3">Reference</th><th className="p-3">Amount</th><th className="p-3">Status</th><th className="p-3">Documents</th><th className="p-3">Evidence</th></tr></thead><tbody>{bankTransfers.length?bankTransfers.map(item=><tr key={item.id} className="border-t align-top"><td className="p-3"><span className="font-mono text-xs">{item.request_reference}</span>{item.status==="awaiting_transfer"&&item.billing_snapshot?.bank_account_number?<div className="mt-2 text-xs text-slate-600"><div>{item.billing_snapshot.bank_name}</div><div>{item.billing_snapshot.bank_account_name}</div><div className="font-semibold">{item.billing_snapshot.bank_account_number}</div><div>Use reference: <strong>{item.request_reference}</strong></div></div>:null}</td><td className="p-3">{money(item.requested_amount,item.currency)}</td><td className="p-3">{label(item.status)}</td><td className="p-3"><div className="flex flex-col items-start gap-2"><button type="button" onClick={()=>downloadDocument(item)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold">Download proforma invoice</button>{item.status==="credited"?<button type="button" onClick={()=>downloadDocument(item,true)} className="rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800">Receipt</button>:null}</div></td><td className="p-3">{item.status==="awaiting_transfer"?<label className="cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold">Upload proof<input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={e=>uploadProof(item.id,e.target.files?.[0]||null)}/></label>:item.proof_available?<button type="button" onClick={()=>downloadProof(item)} className="rounded-lg border px-3 py-1.5 text-xs font-semibold">Download proof</button>:"No proof"}</td></tr>):<tr><td colSpan={5} className="p-6 text-center text-slate-500">No bank-transfer requests.</td></tr>}</tbody></table></div>
       </section>
 
       <section className="rounded-2xl border bg-white shadow-sm overflow-hidden">
