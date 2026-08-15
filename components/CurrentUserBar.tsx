@@ -1,11 +1,11 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   getMe,
-  isHospitalUser,
   type CurrentUser,
 } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
@@ -68,6 +68,9 @@ function OpsNav() {
       <Link href="/ops/patients" className="hover:text-slate-950 hover:underline">
         Patients
       </Link>
+      <Link href="/remidio-import" className="hover:text-slate-950 hover:underline">
+        Remidio Import
+      </Link>
       <Link href="/ops/hospitals" className="hover:text-slate-950 hover:underline">
         Hospitals
       </Link>
@@ -118,6 +121,9 @@ function ClinicNav({ user }: { user: CurrentUser }) {
       </Link>
       <Link href="/retinal-assessments" className="hover:text-slate-950 hover:underline">
         Retinal Assessments
+      </Link>
+      <Link href="/remidio-import" className="hover:text-slate-950 hover:underline">
+        Remidio Import
       </Link>
       {/*
       <Link href="/encounters" className="hover:text-slate-950 hover:underline">
@@ -207,8 +213,6 @@ export default function CurrentUserBar() {
   }, []);
 
   const isOps = canAccessOps(user);
-  const isHospital = isHospitalUser(user);
-
   return (
     <header className="w-full border-b border-slate-200 bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3">

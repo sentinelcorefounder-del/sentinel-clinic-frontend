@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ensureCsrf } from "@/lib/auth";
 
 const API_BASE_URL =
@@ -752,6 +753,90 @@ export async function fetchPatientUploads(id: string | number) {
   }
 
   return res.json();
+}
+
+export type BulkImportSession = {
+  id: number;
+  session_reference: string;
+  service_date: string;
+  organization: string;
+  branch: string;
+  branch_id: number;
+  status: string;
+};
+
+export type BulkImportItem = {
+  item_id: string;
+  source_index: number;
+  detected_format: string;
+  width?: number;
+  height?: number;
+  decision: "unresolved" | "left" | "right" | "rejected" | "invalid" | "skipped";
+  safe_issue_code: string;
+  preview_path: string;
+};
+
+export type BulkImportGroup = {
+  group_id: string;
+  source_index: number;
+  mrn: string;
+  assessment_date?: string;
+  status: string;
+  safe_issue_code: string;
+  encounter?: { id: number; encounter_id: string; patient_name: string; sentinel_patient_id: string } | null;
+  items: BulkImportItem[];
+};
+
+export type BulkImport = {
+  import_id: string;
+  status: string;
+  image_count: number;
+  skipped_count: number;
+  groups: BulkImportGroup[];
+};
+
+export async function fetchBulkImportSessions() {
+  const response = await fetch(`${API_URL}/uploads/bulk-imports/sessions/`, { credentials: "include", cache: "no-store" });
+  const data = await response.json().catch(() => []);
+  if (!response.ok) throw new Error(formatApiError(data, "Failed to load assessment sessions."));
+  return data as BulkImportSession[];
+}
+
+export async function createBulkImageImport(session: BulkImportSession, archive: File) {
+  const body = new FormData();
+  body.append("service_session", String(session.id));
+  body.append("branch", String(session.branch_id));
+  body.append("archive", archive);
+  body.append("idempotency_key", crypto.randomUUID());
+  const response = await fetch(`${API_URL}/uploads/bulk-imports/`, { method: "POST", credentials: "include", headers: await getCsrfHeaders(false), body });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(formatApiError(data, "Failed to inspect the Remidio archive."));
+  return data as BulkImport;
+}
+
+export async function resolveBulkImportGroup(importId: string, groupId: string, encounter: number | undefined, decisions: Record<string, string>) {
+  const response = await fetch(`${API_URL}/uploads/bulk-imports/${importId}/groups/${groupId}/`, { method: "PATCH", credentials: "include", headers: await getCsrfHeaders(true), body: JSON.stringify({ encounter, decisions }) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(formatApiError(data, "Failed to save import decisions."));
+  return data as BulkImport;
+}
+
+export async function searchBulkImportEncounters(importId: string, search: string) {
+  const response = await fetch(`${API_URL}/uploads/bulk-imports/${importId}/encounters/?search=${encodeURIComponent(search)}`, { credentials: "include", cache: "no-store" });
+  const data = await response.json().catch(() => []);
+  if (!response.ok) throw new Error(formatApiError(data, "Failed to search eligible encounters."));
+  return data as Array<{ id: number; encounter_id: string; patient_name: string; sentinel_patient_id: string }>;
+}
+
+export async function confirmBulkImageImport(importId: string) {
+  const response = await fetch(`${API_URL}/uploads/bulk-imports/${importId}/confirm/`, { method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: "{}" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(formatApiError(data, "Failed to confirm image attachments."));
+  return data as BulkImport;
+}
+
+export function bulkImportPreviewUrl(path: string) {
+  return path ? `${API_BASE_URL}${path}` : "";
 }
 
 

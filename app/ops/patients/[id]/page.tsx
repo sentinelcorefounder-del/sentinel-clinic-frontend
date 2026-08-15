@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { serverFetch } from "@/lib/server-api";
 import PatientTimeline from "@/components/PatientTimeline";
@@ -18,11 +20,20 @@ export default async function OpsPatientDetailPage({
   const payments = data.payments || [];
   const reports = data.reports || [];
   const uploads = data.uploads || [];
+  const identities = data.identities || {};
 
   return (
     <div>
       <h1 className="text-3xl font-bold mb-2">{patient.name}</h1>
-      <p className="text-slate-500 mb-6">{patient.patient_id}</p>
+      <p className="text-slate-500 mb-6">Sentinel Master Patient ID: {patient.sentinel_patient_id || "Identity pending"}</p>
+
+      <details className="mb-6 rounded-xl border bg-white p-5 shadow">
+        <summary className="cursor-pointer font-semibold">Identities and linked records</summary>
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
+          <div><h2 className="font-semibold">Patient identities</h2><p className="mt-2 text-sm">Sentinel Master Patient ID: <span className="font-mono">{identities.sentinel_patient_id || "Identity pending"}</span></p>{(identities.organization_identities || []).map((identity: any, index: number) => <p key={`${identity.identity_type}-${index}`} className="mt-1 text-sm">{identity.identity_type === "hospital_mrn" ? "Hospital MRN" : identity.identity_type === "clinic_local_id" ? "Clinic identifier" : identity.identity_type === "legacy_patient_id" ? "Legacy identifier" : "Other identifier"}: <span className="font-mono">{identity.local_identifier}</span> · {identity.organization_name}</p>)}</div>
+          <div><h2 className="font-semibold">Linked records</h2>{(identities.referrals || []).map((row: any) => <p key={row.referral_id} className="mt-2 text-sm">Referral {row.referral_id}{row.hospital_mrn ? ` · Hospital MRN ${row.hospital_mrn}` : ""}{row.issuing_organization ? ` · ${row.issuing_organization}` : ""}</p>)}{(identities.encounters || []).map((row: any) => <p key={row.encounter_id} className="mt-1 text-sm">Encounter {row.encounter_id} · {row.encounter_date}{row.organization ? ` · ${row.organization}` : ""}{row.branch ? ` · ${row.branch}` : ""}</p>)}</div>
+        </div>
+      </details>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Box title="Patient Profile">
