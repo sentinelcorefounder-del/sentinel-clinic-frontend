@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createReport,
@@ -9,7 +9,7 @@ import {
   clinicIssueReport,
   updateReport,
 } from "@/lib/api";
-import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
+import { getMe, type CurrentUser } from "@/lib/auth";
 import type { StructuredReport } from "@/types/report";
 import type { OcularInvestigation } from "@/types/encounter";
 import type { ImageUpload } from "@/types/upload";
@@ -34,8 +34,7 @@ type Props = {
   ocularInvestigations?: OcularInvestigation[];
 };
 
-const ALLOWED_REPORT_ROLES = ["reviewer", "clinic_admin", "super_admin"];
-const ALLOWED_SUBMIT_TO_OPS_ROLES = ["reviewer", "clinic_admin", "super_admin"];
+const CLINICAL_REPORT_ROLES = ["optometrist", "reviewer"];
 
 const VA_OPTIONS = ["", "6/4", "6/5", "6/6", "6/7.5", "6/9", "6/12", "6/15", "6/18", "6/24", "6/36", "6/60", "CF", "HM", "PL", "NPL"];
 const DR_GRADE_OPTIONS = [
@@ -106,6 +105,9 @@ export default function ReportForm({
   const [submittingToOps, setSubmittingToOps] = useState(false);
   const [issuingDirectly, setIssuingDirectly] = useState(false);
   const [signature, setSignature] = useState({ signer_name: "", signer_role: "", signer_registration_number: "" });
+  const [takeoverReason, setTakeoverReason] = useState("");
+  const [correctionNote, setCorrectionNote] = useState("");
+  const [resubmissionNote, setResubmissionNote] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
 
@@ -154,10 +156,10 @@ export default function ReportForm({
       });
 
       setSignature({
-        signer_name: existingReport.signer_name || "",
-        signer_role: existingReport.signer_role || "",
+        signer_name: existingReport.clinical_responsibility?.clinician_name || existingReport.signer_name || "",
+        signer_role: existingReport.clinical_responsibility?.professional_role || existingReport.signer_role || "",
         signer_registration_number:
-          existingReport.signer_registration_number || "",
+          existingReport.clinical_responsibility?.registration_number || existingReport.signer_registration_number || "",
       });
     } else {
       setFormData(blankForm(encounterId, patientId, encounter));
@@ -165,8 +167,9 @@ export default function ReportForm({
   }, [existingReport, encounterId, patientId, encounter]);
 
   const isExisting = !!report?.id;
-  const isEditable = !report || ["draft", "under_review", "signed_off", "returned_to_clinic", "ops_rejected"].includes(report.report_status || "");
-  const canSubmit = !!report && ["draft", "under_review", "signed_off", "returned_to_clinic", "ops_rejected"].includes(report.report_status || "");
+  const hasClinicalRole = Boolean(currentUser?.roles?.some((role) => CLINICAL_REPORT_ROLES.includes(role)));
+  const isEditable = hasClinicalRole && (!report || ["draft", "under_review", "returned_to_clinic", "ops_rejected"].includes(report.report_status || ""));
+  const canSubmit = hasClinicalRole && !!report && ["draft", "under_review", "returned_to_clinic", "ops_rejected"].includes(report.report_status || "");
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const fieldName = e.target.name;
@@ -192,7 +195,7 @@ export default function ReportForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!hasAnyRole(currentUser, ALLOWED_REPORT_ROLES)) {
+    if (!hasClinicalRole) {
       setMessageType("error");
       setMessage("You do not have permission to create or update reports.");
       return;
@@ -225,6 +228,12 @@ export default function ReportForm({
         signer_role: signature.signer_role,
         signer_registration_number:
           signature.signer_registration_number,
+        clinician_name: signature.signer_name,
+        professional_role: signature.signer_role,
+        registration_number: signature.signer_registration_number,
+        takeover_reason: takeoverReason,
+        correction_note: correctionNote,
+        ...(isExisting ? { expected_version: report!.lock_version } : {}),
       };
       const saved = isExisting
         ? await updateReport(report!.id, payload)
@@ -243,17 +252,20 @@ export default function ReportForm({
 
   async function handleSubmitToOps() {
     if (!report?.id) return;
-    if (!hasAnyRole(currentUser, ALLOWED_SUBMIT_TO_OPS_ROLES)) {
+    if (!hasClinicalRole) {
       setMessageType("error");
       setMessage("You do not have permission to submit reports to Ops.");
       return;
     }
     try {
       setSubmittingToOps(true);
-      const response = await submitReportToOps(report.id);
-      setReport((current) => current ? { ...current, report_status: response.report_status || "submitted_to_ops" } : current);
+      const isResubmission = ["returned_to_clinic", "ops_rejected"].includes(report.report_status);
+      if (isResubmission && !resubmissionNote.trim()) throw new Error("A resubmission note is required.");
+      const response = await submitReportToOps(report.id, report.lock_version, resubmissionNote);
+      setReport((current) => current ? { ...current, report_status: response.report_status || "submitted_to_ops", lock_version: response.lock_version ?? current.lock_version } : current);
       setMessageType("success");
       setMessage("Report submitted to Ops successfully.");
+      setResubmissionNote("");
       await refresh();
     } catch (error) {
       setMessageType("error");
@@ -305,7 +317,8 @@ export default function ReportForm({
 
       const response = await clinicIssueReport(
         report.id,
-        signature
+        signature,
+        report.lock_version
       );
 
       setReport(
@@ -334,7 +347,7 @@ export default function ReportForm({
   }
 
   if (authLoading) return <div className="rounded-lg border p-4">Checking permissions...</div>;
-  if (!hasAnyRole(currentUser, ALLOWED_REPORT_ROLES)) return <div className="rounded-lg border bg-gray-50 p-4">You do not have permission to create or update reports.</div>;
+  if (!hasClinicalRole) return <div className="rounded-lg border bg-gray-50 p-4">Exact optometrist or qualified retinal-reviewer authority is required.</div>;
   if ((patientConsentStatus || "").trim().toLowerCase() !== "completed") {
     return <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800">Report creation is blocked until patient consent is completed.</div>;
   }
@@ -347,7 +360,24 @@ export default function ReportForm({
           <p className="mt-1 text-sm text-gray-600">
             {isExisting ? "Changes update the existing report for this encounter. A second report cannot be created." : "Create the single structured report for this encounter."}
           </p>
+          {report ? <p className="mt-1 font-mono text-xs text-slate-600">{report.report_id} · {report.report_status.replaceAll("_", " ")} · lock version {report.lock_version}</p> : null}
         </div>
+
+        <section className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <h3 className="font-semibold text-blue-950">Clinical responsibility</h3>
+          <p className="mt-1 text-sm text-blue-900">Clinical authority comes from your optometrist or qualified reviewer role, independently of any clinic-administration role.</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <input value={signature.signer_name} onChange={(e) => setSignature({ ...signature, signer_name: e.target.value })} placeholder="Clinician full name" className="rounded border bg-white p-3" disabled={!isEditable} />
+            <input value={signature.signer_role} onChange={(e) => setSignature({ ...signature, signer_role: e.target.value })} placeholder="Professional role" className="rounded border bg-white p-3" disabled={!isEditable} />
+            <input value={signature.signer_registration_number} onChange={(e) => setSignature({ ...signature, signer_registration_number: e.target.value })} placeholder="Professional registration number" className="rounded border bg-white p-3" disabled={!isEditable} />
+          </div>
+          {report?.clinical_responsibility && report.clinical_responsibility.current_clinician !== currentUser?.id ? (
+            <textarea value={takeoverReason} onChange={(e) => setTakeoverReason(e.target.value)} placeholder="Required professional takeover reason" rows={2} className="mt-3 w-full rounded border bg-white p-3" disabled={!isEditable} />
+          ) : null}
+          {report?.clinical_responsibility ? <p className="mt-2 text-xs text-blue-900">Responsible: {report.clinical_responsibility.clinician_name} · {report.clinical_responsibility.professional_role} · {report.clinical_responsibility.branch_name}</p> : null}
+        </section>
+
+        {report?.return_reason ? <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"><p className="font-semibold">Ops correction required</p><p className="mt-1 whitespace-pre-wrap text-sm">{report.return_reason}</p></div> : null}
 
         {report?.return_reason || report?.ops_review_note ? (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -410,7 +440,7 @@ export default function ReportForm({
             name="final_clinical_summary"
             value={formData.final_clinical_summary}
             onChange={(event) =>
-              setFormData((current: any) => ({
+              setFormData((current) => ({
                 ...current,
                 final_clinical_summary: event.target.value,
                 clinical_summary_overridden: true,
@@ -423,6 +453,9 @@ export default function ReportForm({
           />
         </label>
         <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="Notes" className="w-full rounded border p-3" rows={4} disabled={!isEditable} />
+        {report && ["returned_to_clinic", "ops_rejected"].includes(report.report_status) ? (
+          <textarea value={correctionNote} onChange={(e) => setCorrectionNote(e.target.value)} placeholder="Correction note for this saved clinical version" className="w-full rounded border p-3" rows={3} disabled={!isEditable} />
+        ) : null}
 
         <section className="rounded-lg border bg-slate-50 p-4">
           <h3 className="font-semibold">Report Content & Attachments</h3>
@@ -489,15 +522,8 @@ export default function ReportForm({
           ) : null}
         </section>
 
-        {report?.id && workflowRoute === "clinic_managed" && canSubmit ? (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h3 className="font-semibold text-blue-950">Electronic Clinician Signature</h3>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <input value={signature.signer_name} onChange={(e)=>setSignature({...signature, signer_name:e.target.value})} placeholder="Clinician full name" className="rounded border bg-white p-3" />
-              <input value={signature.signer_role} onChange={(e)=>setSignature({...signature, signer_role:e.target.value})} placeholder="Professional role" className="rounded border bg-white p-3" />
-              <input value={signature.signer_registration_number} onChange={(e)=>setSignature({...signature, signer_registration_number:e.target.value})} placeholder="Registration number" className="rounded border bg-white p-3" />
-            </div>
-          </div>
+        {canSubmit && workflowRoute === "sentinel_managed" && report && ["returned_to_clinic", "ops_rejected"].includes(report.report_status) ? (
+          <textarea value={resubmissionNote} onChange={(e) => setResubmissionNote(e.target.value)} placeholder="Required resubmission note for Ops" className="w-full rounded border border-emerald-300 p-3" rows={3} />
         ) : null}
 
         {message ? <div className={`rounded-lg border p-3 text-sm font-medium ${messageType === "error" ? "border-red-200 bg-red-50 text-red-800" : messageType === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>{message}</div> : null}
@@ -559,12 +585,26 @@ export default function ReportForm({
             </button>
           ) : null}
         </div>
+        {report?.versions?.length ? <section className="rounded-lg border p-4"><h3 className="font-semibold">Clinical version history</h3><div className="mt-3 space-y-2">{report.versions.map((version) => <div key={version.id} className="rounded border bg-slate-50 p-3 text-sm"><p className="font-semibold">Version {version.version_number} · {version.purpose.replaceAll("_", " ")}</p><p>{version.editor_display} · {version.created_at}</p>{version.correction_note ? <p className="mt-1 whitespace-pre-wrap text-slate-700">{version.correction_note}</p> : null}{version.legacy_pdf_unbound ? <p className="mt-1 text-amber-800">Legacy issued record: no exact historical PDF bytes are bound.</p> : null}</div>)}</div></section> : null}
       </form>
     </div>
   );
 }
 
-function AttachmentChoice({ label, itemId, captionKey, selected, disabled, formData, setFormData, selectedField }: any) {
+type ReportFormData = ReturnType<typeof blankForm>;
+
+type AttachmentChoiceProps = {
+  label: string;
+  itemId: number;
+  captionKey: string;
+  selected: number[];
+  disabled: boolean;
+  formData: ReportFormData;
+  setFormData: React.Dispatch<React.SetStateAction<ReportFormData>>;
+  selectedField: "selected_fundus_upload_ids" | "selected_ocular_investigation_ids";
+};
+
+function AttachmentChoice({ label, itemId, captionKey, selected, disabled, formData, setFormData, selectedField }: AttachmentChoiceProps) {
   const checked = selected.includes(itemId);
   return (
     <div className="rounded border bg-white p-3">
@@ -574,7 +614,7 @@ function AttachmentChoice({ label, itemId, captionKey, selected, disabled, formD
           checked={checked}
           disabled={disabled}
           onChange={(event) =>
-            setFormData((current: any) => ({
+            setFormData((current) => ({
               ...current,
               [selectedField]: event.target.checked
                 ? [...current[selectedField], itemId]
@@ -589,7 +629,7 @@ function AttachmentChoice({ label, itemId, captionKey, selected, disabled, formD
           value={formData.attachment_captions[captionKey] || ""}
           disabled={disabled}
           onChange={(event) =>
-            setFormData((current: any) => ({
+            setFormData((current) => ({
               ...current,
               attachment_captions: {
                 ...current.attachment_captions,
@@ -605,7 +645,15 @@ function AttachmentChoice({ label, itemId, captionKey, selected, disabled, formD
   );
 }
 
-function EyeSection({ title, prefix, data, onChange, disabled }: any) {
+type EyeSectionProps = {
+  title: string;
+  prefix: "left" | "right";
+  data: ReportFormData;
+  onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  disabled: boolean;
+};
+
+function EyeSection({ title, prefix, data, onChange, disabled }: EyeSectionProps) {
   return (
     <div className="rounded-lg border bg-slate-50 p-4">
       <h3 className="mb-3 font-semibold">{title}</h3>
@@ -619,12 +667,21 @@ function EyeSection({ title, prefix, data, onChange, disabled }: any) {
   );
 }
 
-function SelectField({ label, name, value, onChange, options, disabled }: any) {
+type SelectFieldProps = {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: Array<{ value: string; label: string }>;
+  disabled: boolean;
+};
+
+function SelectField({ label, name, value, onChange, options, disabled }: SelectFieldProps) {
   return (
     <label className="space-y-1 text-sm">
       <span className="font-medium">{label}</span>
       <select name={name} value={value} onChange={onChange} className="w-full rounded border bg-white p-3" disabled={disabled}>
-        {options.map((option: any) => <option key={`${name}-${option.value}`} value={option.value}>{option.label}</option>)}
+        {options.map((option) => <option key={`${name}-${option.value}`} value={option.value}>{option.label}</option>)}
       </select>
     </label>
   );

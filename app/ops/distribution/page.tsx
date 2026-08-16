@@ -44,6 +44,8 @@ export default function OpsDistributionPage() {
 
   useEffect(() => {
     load();
+    // Search remains explicitly submitted; only the status filter auto-refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   async function release(item: DistributionQueueItem) {
@@ -56,7 +58,7 @@ export default function OpsDistributionPage() {
       setBusyId(item.id);
       setError("");
       setMessage("");
-      await releaseReportToHospital(item.id);
+      await releaseReportToHospital(item.id, item.lock_version);
       setMessage(`Report ${item.report_id} released to ${item.source_hospital_name}.`);
       await load();
     } catch (err) {

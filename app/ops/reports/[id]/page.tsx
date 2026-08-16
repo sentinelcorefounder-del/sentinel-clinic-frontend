@@ -9,6 +9,18 @@ import {
   returnOpsReport,
 } from "@/lib/api";
 import ReportFormatMenu from "@/components/ReportFormatMenu";
+import type { StructuredReport } from "@/types/report";
+
+type OpsReport = StructuredReport & {
+  sentinel_patient_id?: string;
+  patient_name: string;
+  patient_id_display: string;
+  encounter_id_display: string;
+  clinic_name: string;
+  payment_status: string;
+  referral?: { source_hospital_name?: string; matched_clinic_name?: string; payment_status?: string } | null;
+  images?: Array<{ id: number; url: string; eye_laterality: string; image_quality: string; ai_prediction?: string }>;
+};
 
 export default function OpsReportReviewPage({
   params,
@@ -16,7 +28,7 @@ export default function OpsReportReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const [id, setId] = useState("");
-  const [report, setReport] = useState<any>(null);
+  const [report, setReport] = useState<OpsReport | null>(null);
   const [note, setNote] = useState("");
   const [signature, setSignature] = useState({
     signer_name: "",
@@ -46,9 +58,14 @@ export default function OpsReportReviewPage({
     try {
       setBusy(true);
       setMessage("");
+      const submittedVersion = report?.submitted_version;
+      if (!report || !submittedVersion) {
+        throw new Error("The submitted report version is unavailable. Reload before review.");
+      }
+      const activeReport = report;
 
       if (kind === "return") {
-        await returnOpsReport(id, note);
+        await returnOpsReport(id, note, activeReport.lock_version, submittedVersion);
       }
 
       if (kind === "issue") {
@@ -79,11 +96,11 @@ export default function OpsReportReviewPage({
           return;
         }
 
-        await approveAndIssueOpsReport(id, note, signature);
+        await approveAndIssueOpsReport(id, note, signature, activeReport.lock_version, submittedVersion);
       }
 
       if (kind === "reject") {
-        await rejectOpsReport(id, note);
+        await rejectOpsReport(id, note, activeReport.lock_version, submittedVersion);
       }
 
       await load(id);
@@ -118,9 +135,7 @@ export default function OpsReportReviewPage({
   }
 
   const canReview = report.report_status === "submitted_to_ops";
-  const canIssue = ["submitted_to_ops", "ops_rejected"].includes(
-    report.report_status || ""
-  );
+  const canIssue = report.report_status === "submitted_to_ops" && Boolean(report.submitted_version);
 
   const issueDisabled =
     busy ||
@@ -184,7 +199,7 @@ export default function OpsReportReviewPage({
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Patient">
           <p>{report.patient_name}</p>
-          <p>Sentinel ID: {report.sentinel_patient_id || report.patient?.sentinel_patient_id || "Identity pending"}</p>
+          <p>Sentinel ID: {report.sentinel_patient_id || "Identity pending"}</p>
           <p>Local ID: {report.patient_id_display}</p>
           <p>Encounter: {report.encounter_id_display}</p>
         </Card>
@@ -201,6 +216,8 @@ export default function OpsReportReviewPage({
 
         <Card title="Status">
           <p>{String(report.report_status).replaceAll("_", " ")}</p>
+          <p>Lock version: {report.lock_version}</p>
+          <p>Submitted version: {report.submitted_version || "-"}</p>
           <p>Submitted: {report.submitted_to_ops_at || "-"}</p>
           <p>Resubmissions: {report.resubmission_count || 0}</p>
         </Card>
@@ -208,6 +225,7 @@ export default function OpsReportReviewPage({
 
       <section className="rounded-xl bg-white p-6 shadow">
         <h2 className="mb-4 text-xl font-bold">Clinical Report</h2>
+        {report.clinical_responsibility ? <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm"><p className="font-semibold">Responsible clinician</p><p>{report.clinical_responsibility.clinician_name} · {report.clinical_responsibility.professional_role} · {report.clinical_responsibility.registration_number}</p><p>{report.clinical_responsibility.clinic_name} · {report.clinical_responsibility.branch_name} · authority: {report.clinical_responsibility.authority_used}</p></div> : <p className="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm">Historical author is unknown; no responsibility has been inferred.</p>}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Eye title="Left Eye" dr={report.left_dr_grade} mac={report.left_maculopathy_grade} />
@@ -225,13 +243,18 @@ export default function OpsReportReviewPage({
       </section>
 
       <section className="rounded-xl bg-white p-6 shadow">
+        <h2 className="mb-4 text-xl font-bold">Clinical Versions</h2>
+        <div className="space-y-3">{report.versions?.map((version) => <div key={version.id} className={`rounded border p-3 text-sm ${version.id === report.submitted_version ? "border-blue-400 bg-blue-50" : ""}`}><p className="font-semibold">Version {version.version_number}{version.id === report.submitted_version ? " · submitted for this review" : ""}</p><p>{version.editor_display} · {version.created_at}</p>{version.correction_note ? <p className="mt-1">Correction: {version.correction_note}</p> : null}</div>)}</div>
+      </section>
+
+      <section className="rounded-xl bg-white p-6 shadow">
         <h2 className="mb-4 text-xl font-bold">Fundus Images</h2>
 
         {!report.images?.length ? (
           <p>No images found.</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {report.images.map((image: any) => (
+            {report.images.map((image) => (
               <a
                 key={image.id}
                 href={image.url}
@@ -239,6 +262,8 @@ export default function OpsReportReviewPage({
                 rel="noreferrer"
                 className="rounded border p-3"
               >
+                {/* Authenticated clinical assets are intentionally not routed through Next image optimization. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={image.url}
                   alt={`${image.eye_laterality} fundus`}
@@ -401,7 +426,7 @@ export default function OpsReportReviewPage({
           <p>No timeline entries yet.</p>
         ) : (
           <div className="space-y-3">
-            {report.status_events.map((event: any) => (
+            {report.status_events.map((event) => (
               <div key={event.id} className="rounded border p-3 text-sm">
                 <p className="font-semibold">
                   {String(event.event_type).replaceAll("_", " ")}
@@ -410,6 +435,8 @@ export default function OpsReportReviewPage({
                 {event.note ? (
                   <p className="mt-1 text-slate-600">{event.note}</p>
                 ) : null}
+                {event.correction_note ? <p className="mt-1 text-slate-700">Correction: {event.correction_note}</p> : null}
+                {event.target_version ? <p className="mt-1 text-xs text-slate-500">Version record: {event.target_version} · authority: {event.authority_used || "system/legacy"}</p> : null}
               </div>
             ))}
           </div>

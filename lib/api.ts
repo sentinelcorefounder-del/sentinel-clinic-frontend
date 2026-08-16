@@ -542,7 +542,11 @@ export async function fetchEncounterReports(id: string) {
     throw new Error(`Failed to fetch encounter reports: ${res.status} ${text}`);
   }
 
-  return res.json();
+  const reports = await res.json();
+  if (!Array.isArray(reports) || reports.length > 1) {
+    throw new Error("The encounter report state is inconsistent. No report was selected.");
+  }
+  return reports as import("@/types/report").StructuredReport[];
 }
 
 export async function createReport(data: any) {
@@ -562,12 +566,12 @@ export async function createReport(data: any) {
   return responseData;
 }
 
-export async function submitReportToOps(reportId: string | number) {
+export async function submitReportToOps(reportId: string | number, expectedVersion: number, resubmissionNote = "") {
   const res = await fetch(`${API_URL}/reports/${reportId}/submit-to-ops/`, {
     method: "POST",
     credentials: "include",
     headers: await getCsrfHeaders(true),
-    body: JSON.stringify({}),
+    body: JSON.stringify({ expected_version: expectedVersion, resubmission_note: resubmissionNote }),
   });
 
   const responseData = await res.json().catch(() => ({}));
@@ -864,12 +868,12 @@ export async function fetchOpsReport(reportId: string | number) {
   return data;
 }
 
-export async function returnOpsReport(reportId: string | number, reason: string) {
+export async function returnOpsReport(reportId: string | number, reason: string, expectedVersion: number, submittedVersion: number) {
   const res = await fetch(`${API_URL}/ops/reports/${reportId}/return/`, {
     method: "POST",
     credentials: "include",
     headers: await getCsrfHeaders(true),
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ reason, expected_version: expectedVersion, submitted_version: submittedVersion }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatApiError(data, "Failed to return report."));
@@ -885,7 +889,9 @@ export type OpsReportSignature = {
 export async function approveAndIssueOpsReport(
   reportId: string | number,
   note: string,
-  signature: OpsReportSignature
+  signature: OpsReportSignature,
+  expectedVersion: number,
+  submittedVersion: number
 ) {
   const res = await fetch(
     `${API_URL}/ops/reports/${reportId}/approve/`,
@@ -899,6 +905,8 @@ export async function approveAndIssueOpsReport(
         signer_role: signature.signer_role,
         signer_registration_number:
           signature.signer_registration_number,
+        expected_version: expectedVersion,
+        submitted_version: submittedVersion,
       }),
     }
   );
@@ -917,12 +925,12 @@ export async function approveAndIssueOpsReport(
   return data;
 }
 
-export async function rejectOpsReport(reportId: string | number, note: string) {
+export async function rejectOpsReport(reportId: string | number, note: string, expectedVersion: number, submittedVersion: number) {
   const res = await fetch(`${API_URL}/ops/reports/${reportId}/reject/`, {
     method: "POST",
     credentials: "include",
     headers: await getCsrfHeaders(true),
-    body: JSON.stringify({ note }),
+    body: JSON.stringify({ note, expected_version: expectedVersion, submitted_version: submittedVersion }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatApiError(data, "Failed to reject report."));
@@ -1193,8 +1201,8 @@ export async function createClinicDirectPatient(data: any) {
 }
 
 
-export async function clinicIssueReport(reportId: string | number, signature: { signer_name: string; signer_role: string; signer_registration_number: string; }) {
-  const res = await fetch(`${API_URL}/reports/${reportId}/clinic-issue/`, { method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: JSON.stringify(signature) });
+export async function clinicIssueReport(reportId: string | number, signature: { signer_name: string; signer_role: string; signer_registration_number: string; }, expectedVersion: number) {
+  const res = await fetch(`${API_URL}/reports/${reportId}/clinic-issue/`, { method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: JSON.stringify({ ...signature, expected_version: expectedVersion }) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatApiError(data, "Failed to sign and issue report."));
   return data;
@@ -1219,6 +1227,7 @@ export type DistributionQueueItem = {
   issued_at: string;
   hospital_released_at: string;
   pdf_url: string;
+  lock_version: number;
 };
 
 export async function fetchDistributionQueue(params?: {
@@ -1244,7 +1253,8 @@ export async function fetchDistributionQueue(params?: {
 }
 
 export async function releaseReportToHospital(
-  reportId: string | number
+  reportId: string | number,
+  expectedVersion: number
 ) {
   const res = await fetch(
     `${API_URL}/ops/distribution/${reportId}/release-hospital/`,
@@ -1252,7 +1262,7 @@ export async function releaseReportToHospital(
       method: "POST",
       credentials: "include",
       headers: await getCsrfHeaders(true),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ expected_version: expectedVersion }),
     }
   );
   const data = await res.json().catch(() => ({}));

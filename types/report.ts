@@ -100,4 +100,41 @@ export type StructuredReport = {
   hospital_released_by?: number | null;
   patient_delivery_required?: boolean;
   patient_delivered_at?: string | null;
+  lock_version: number;
+  submitted_version?: number | null;
+  issued_version?: number | null;
+  clinical_responsibility?: {
+    current_clinician: number;
+    original_clinician: number;
+    clinician_name: string;
+    professional_role: string;
+    registration_number: string;
+    authority_used: "optometrist" | "reviewer";
+    clinic_name: string;
+    branch_name: string;
+    accepted_at: string;
+    takeover_reason?: string;
+  } | null;
+  versions?: Array<{
+    id: number;
+    version_number: number;
+    checksum_sha256: string;
+    editor_display: string;
+    purpose: string;
+    correction_note: string;
+    created_at: string;
+    pdf_generated_at?: string | null;
+    legacy_pdf_unbound: boolean;
+  }>;
+  status_events?: Array<{
+    id: number;
+    event_type: string;
+    note: string;
+    correction_note?: string;
+    authority_used?: string;
+    source_version?: number | null;
+    target_version?: number | null;
+    actor_display: string;
+    created_at: string;
+  }>;
 };
