@@ -7,6 +7,13 @@ export type OnwardResponsibility = {
   takeover_reason: string;
 };
 
+export type OnwardCapabilities = {
+  can_accept_responsibility: boolean;
+  can_author: boolean;
+  can_administer_recipient: boolean;
+  can_distribute?: boolean;
+};
+
 export type OnwardReferralVersion = {
   version_number: number;
   status: "draft" | "finalized" | "superseded" | "voided";
@@ -43,6 +50,7 @@ export type OnwardReferral = {
   route: "originating_hospital" | "registered_hospital" | "clinic_download";
   lifecycle: "draft" | "finalized" | "superseded" | "voided";
   responsibility?: OnwardResponsibility | null;
+  capabilities: OnwardCapabilities;
   current_version: OnwardReferralVersion | null;
   versions: OnwardReferralVersion[];
   created_at: string;
@@ -54,6 +62,7 @@ export type OnwardEligibility = {
   encounter_completed: boolean;
   eligible_sources: Array<"ocular" | "retinal">;
   responsibility: OnwardResponsibility | null;
+  capabilities: OnwardCapabilities;
 };
 
 export type RegisteredHospital = { id: number; name: string; clinic_id: string };
