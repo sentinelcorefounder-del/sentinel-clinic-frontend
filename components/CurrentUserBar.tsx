@@ -133,6 +133,9 @@ function ClinicNav({ user }: { user: CurrentUser }) {
       <Link href="/reports" className="hover:text-slate-950 hover:underline">
         Reports
       </Link>
+      <Link href="/onward-referrals" className="hover:text-slate-950 hover:underline">
+        Onward Referrals
+      </Link>
       <Link href="/finance" className="hover:text-slate-950 hover:underline">
         Finance
       </Link>
@@ -166,6 +169,9 @@ function HospitalNav() {
       </Link>
       <Link href="/hospital/reports" className="hover:text-slate-950 hover:underline">
         Reports
+      </Link>
+      <Link href="/hospital/onward-referrals" className="hover:text-slate-950 hover:underline">
+        Onward Referrals
       </Link>
       <Link href="/hospital/payouts" className="hover:text-slate-950 hover:underline">
         Payouts

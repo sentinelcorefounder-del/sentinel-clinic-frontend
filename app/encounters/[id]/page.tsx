@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ import ConsentForm from "@/components/ConsentForm";
 import OcularAssessmentForm from "@/components/OcularAssessmentForm";
 import OcularInvestigationsAIReview from "@/components/OcularInvestigationsAIReview";
 import RemidioMobileTransfer from "@/components/RemidioMobileTransfer";
+import OnwardReferralManager from "@/components/OnwardReferralManager";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -875,6 +877,13 @@ export default function EncounterDetailPage({ params }: Props) {
           </div>
         )}
       </section>
+
+      <OnwardReferralManager
+        encounterId={encounter.id}
+        encounterReference={encounter.encounter_id}
+        patientPhone={patient.phone || ""}
+        user={currentUser}
+      />
     </main>
   );
 }
