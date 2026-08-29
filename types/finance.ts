@@ -2,6 +2,7 @@ export type FinanceWallet = {
   id: number;
   organization: number;
   organization_name: string;
+  organization_type: "clinic" | "hospital" | "sentinel" | "service_partner";
   currency: string;
   is_active: boolean;
   credit_limit: string;
@@ -64,15 +65,66 @@ export type LedgerEntry = {
 
 export type FinancialRecord = {
   id: number;
+  encounter: number;
   encounter_id: string;
+  patient_reference: string;
+  patient_display: string;
   organization_name: string;
+  branch_name: string | null;
+  service_session_reference: string | null;
   contract_name: string | null;
   pricing_rule_name: string | null;
   status: string;
   currency: string;
   gross_amount: string;
+  allocated_amount: string;
   outstanding_amount: string;
+  clinical_status: string;
+  payment_responsibility: string;
+  allocations?: Array<{ beneficiary_role: string; beneficiary_organization_name: string | null; label: string; amount: string; status: string }>;
+  captured_at: string | null;
   created_at: string;
+};
+
+export type SentinelFinanceDashboard = {
+  verified_sentinel_cash_received: string;
+  pending_unverified_funding: string;
+  available_sentinel_funds: string;
+  reserved_sentinel_funds: string;
+  sponsorship_commitments: Record<string, string>;
+  sponsored_services_spent: string;
+  clinic_payables: string;
+  service_partner_payables: string;
+  settled_allocations: string;
+  settled_service_partner_earnings: string;
+  refunds_reversals_corrections: string;
+  safeguarded_committed_funds: string;
+  approved_transfer_commitments: string;
+  transferable_surplus: string;
+  calculated_at: string;
+  formula: string;
+  applied_filters: Record<string, string>;
+  drill_down: Record<string, string>;
+};
+
+export type EncounterSponsorship = {
+  id: number; sponsorship_reference: string; encounter: number; encounter_reference: string;
+  patient_reference: string; patient_display: string; organization_name: string; branch_name: string | null;
+  financial_record: number; sponsor_wallet: number; sponsor_name: string; category: string; reason: string;
+  status: string; currency: string; patient_amount: string; gross_service_value: string;
+  pricing_snapshot: Record<string, unknown>; allocation_snapshot: Array<{ role: string; organization: string; label: string; amount: string }>;
+  created_by_name: string; decided_by_name: string | null; decision_reason: string;
+  submitted_at: string | null; decided_at: string | null; captured_at: string | null;
+  cancellation_reason: string; created_at: string;
+};
+
+export type TreasuryTransfer = {
+  id: number; transfer_reference: string; wallet: number; wallet_name: string; amount: string;
+  currency: string; purpose: string; destination_label: string; external_reference: string;
+  status: string; available_surplus_snapshot: Record<string, string>; created_by_name: string;
+  decided_by_name: string | null; executed_by_name: string | null; decided_at: string | null;
+  executed_at: string | null; decision_reason: string; cancellation_reason: string;
+  evidence_available: boolean; created_at: string;
 };
 
 export type PartnerFinance = {
