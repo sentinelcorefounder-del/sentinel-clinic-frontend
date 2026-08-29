@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchEncounterById,
   updateEncounter,
@@ -52,6 +52,62 @@ function resolveFileUrl(fileUrl?: string | null) {
   return fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl}`;
 }
 
+type EncounterSectionProps = {
+  sectionId: string;
+  title: string;
+  status?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+};
+
+function EncounterSection({
+  sectionId,
+  title,
+  status,
+  open,
+  onToggle,
+  children,
+}: EncounterSectionProps) {
+  const buttonId = `encounter-section-${sectionId}-button`;
+  const panelId = `encounter-section-${sectionId}-panel`;
+
+  return (
+    <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
+      <h2>
+        <button
+          id={buttonId}
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={onToggle}
+          className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset sm:px-6"
+        >
+          <span className="min-w-0 font-semibold text-slate-950">{title}</span>
+          <span className="flex shrink-0 items-center gap-3">
+            {status ? (
+              <span className="inline-flex max-w-32 truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 sm:max-w-none">
+                {status}
+              </span>
+            ) : null}
+            <span aria-hidden="true" className="text-xl leading-none text-slate-500">
+              {open ? "−" : "+"}
+            </span>
+          </span>
+        </button>
+      </h2>
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={buttonId}
+        className={open ? "border-t p-3 sm:p-5" : "hidden"}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export default function EncounterDetailPage({ params }: Props) {
   const [encounter, setEncounter] = useState<Encounter | null>(null);
   const [patient, setPatient] = useState<any>(null);
@@ -86,6 +142,36 @@ export default function EncounterDetailPage({ params }: Props) {
   const [measurementMessage, setMeasurementMessage] = useState("");
   const [measurementMessageType, setMeasurementMessageType] =
     useState<"success" | "error" | "info">("info");
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set());
+  const deepLinkHandled = useRef(false);
+
+  const focusSection = useCallback((sectionId: string) => {
+    window.requestAnimationFrame(() => {
+      document.getElementById(`encounter-section-${sectionId}-button`)?.focus();
+    });
+  }, []);
+
+  const expandSection = useCallback(
+    (sectionId: string, focus = false) => {
+      setOpenSections((current) => {
+        if (current.has(sectionId)) return current;
+        const next = new Set(current);
+        next.add(sectionId);
+        return next;
+      });
+      if (focus) focusSection(sectionId);
+    },
+    [focusSection]
+  );
+
+  function toggleSection(sectionId: string) {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  }
 
   async function loadEncounterPage(encounterId: string) {
     const encounterData: Encounter = await fetchEncounterById(encounterId);
@@ -143,6 +229,28 @@ export default function EncounterDetailPage({ params }: Props) {
     resolveParamsAndLoad();
   }, [params]);
 
+  useEffect(() => {
+    if (loading || deepLinkHandled.current) return;
+    deepLinkHandled.current = true;
+
+    const aliases: Record<string, string> = {
+      ai: "photographs",
+      "ai-analysis": "photographs",
+      consent: "record-consents",
+      ocular: "ocular-assessment",
+      "ocular-ai": "ocular-investigations",
+      report: "retinal-report",
+      referral: "onward-referral",
+    };
+    const requested = new URLSearchParams(window.location.search).get("section")
+      || window.location.hash.replace(/^#/, "");
+    if (requested) {
+      expandSection(aliases[requested] || requested, true);
+    } else if (reports.some((report) => report.return_reason || report.ops_review_note)) {
+      expandSection("retinal-report");
+    }
+  }, [expandSection, loading, reports]);
+
   async function refreshUploads() {
     if (!encounter?.id) return;
     const refreshedUploads = await fetchEncounterUploads(String(encounter.id));
@@ -163,6 +271,7 @@ export default function EncounterDetailPage({ params }: Props) {
 
     if (!allowed) {
       setUploadActionMessage("You do not have permission to delete uploaded images.");
+      expandSection("photographs", true);
       return;
     }
 
@@ -184,6 +293,7 @@ export default function EncounterDetailPage({ params }: Props) {
       setUploadActionMessage(
         err instanceof Error ? err.message : "Failed to delete image."
       );
+      expandSection("photographs", true);
     } finally {
       setDeletingUploadId(null);
     }
@@ -263,6 +373,7 @@ export default function EncounterDetailPage({ params }: Props) {
           ? err.message
           : "Failed to save VA, IOP and dilation details."
       );
+      expandSection("technician", true);
     } finally {
       setSavingMeasurements(false);
     }
@@ -290,9 +401,9 @@ export default function EncounterDetailPage({ params }: Props) {
   }
 
   return (
-    <main className="space-y-8 p-10">
-      <section className="rounded-lg border p-6">
-        <div className="mb-4 flex items-start justify-between gap-4">
+    <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-10">
+      <section className="rounded-xl border bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row">
           <div>
             <h1 className="text-2xl font-bold">
               {encounter.programme === "ocular_diagnostics"
@@ -306,17 +417,17 @@ export default function EncounterDetailPage({ params }: Props) {
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link href={`/patients/${patient.id}`} className="rounded-lg border px-4 py-2">
               View Patient
             </Link>
-            <Link href="/retinal-assessments">
+            <Link href="/retinal-assessments" className="rounded-lg px-2 py-2 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
               Back to Retinal Assessments
             </Link>
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <p>
             <strong>Assessment ID:</strong> {encounter.encounter_id}
           </p>
@@ -348,7 +459,32 @@ export default function EncounterDetailPage({ params }: Props) {
         </div>
       </section>
 
-      <section className="rounded-lg border p-6">
+      {encounterAny?.poor_va_flag ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          <p className="font-semibold">Poor corrected/pinhole VA flag</p>
+          <p className="mt-1">
+            {encounterAny.poor_va_reason ||
+              "Corrected/pinhole VA is 6/12 or worse. Optometrist should consider referral based on clinical judgement."}
+          </p>
+        </div>
+      ) : null}
+
+      {reports.some((report) => report.return_reason || report.ops_review_note) ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          <p className="font-semibold">Retinal report requires attention</p>
+          <p className="mt-1">Open Retinal Report or Structured Reports to review the Sentinel Ops note.</p>
+        </div>
+      ) : null}
+
+      <div className="space-y-3" aria-label="Encounter workflow sections">
+      <EncounterSection
+        sectionId="technician"
+        title="Technician Capture: VA, IOP and Dilation"
+        status={Object.values(measurementForm).some(Boolean) ? "In progress" : "Not started"}
+        open={openSections.has("technician")}
+        onToggle={() => toggleSection("technician")}
+      >
+      <div className="rounded-lg p-1 sm:p-2">
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Technician Capture: VA, IOP and Dilation</h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -368,16 +504,6 @@ export default function EncounterDetailPage({ params }: Props) {
             }`}
           >
             {measurementMessage}
-          </div>
-        ) : null}
-
-        {encounterAny?.poor_va_flag ? (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-semibold">Poor corrected/pinhole VA flag</p>
-            <p className="mt-1">
-              {encounterAny.poor_va_reason ||
-                "Corrected/pinhole VA is 6/12 or worse. Optometrist should consider referral based on clinical judgement."}
-            </p>
           </div>
         ) : null}
 
@@ -549,21 +675,44 @@ export default function EncounterDetailPage({ params }: Props) {
             {savingMeasurements ? "Saving..." : "Save VA / IOP / Dilation Details"}
           </button>
         </div>
-      </section>
+      </div>
+      </EncounterSection>
 
+      <EncounterSection
+        sectionId="upload"
+        title="Upload Retinal Image"
+        status={uploads.length ? `${uploads.length} image${uploads.length === 1 ? "" : "s"} present` : "Not started"}
+        open={openSections.has("upload")}
+        onToggle={() => toggleSection("upload")}
+      >
       <ImageUploadForm
         encounterId={encounter.id}
         patientId={encounter.patient}
         existingUploads={uploads}
         onUploadSuccess={handleImageUploaded}
       />
+      </EncounterSection>
 
+      <EncounterSection
+        sectionId="remidio"
+        title="Import from Remidio"
+        open={openSections.has("remidio")}
+        onToggle={() => toggleSection("remidio")}
+      >
       <RemidioMobileTransfer
         encounterId={encounter.id}
         onConfirmed={handleImageUploaded}
       />
+      </EncounterSection>
 
-      <section className="rounded-lg border p-6">
+      <EncounterSection
+        sectionId="photographs"
+        title="Fundus Photographs"
+        status={uploads.length ? `${uploads.length} available` : "Not started"}
+        open={openSections.has("photographs")}
+        onToggle={() => toggleSection("photographs")}
+      >
+      <div className="rounded-lg p-1 sm:p-2">
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Fundus Photographs</h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -682,15 +831,31 @@ export default function EncounterDetailPage({ params }: Props) {
             })}
           </div>
         )}
-      </section>
+      </div>
+      </EncounterSection>
 
+      <EncounterSection
+        sectionId="record-consents"
+        title="Record Consents"
+        status={patient.consent_status === "completed" ? "Complete" : "Attention required"}
+        open={openSections.has("record-consents")}
+        onToggle={() => toggleSection("record-consents")}
+      >
       <ConsentForm
         encounterId={encounter.id}
         patientId={encounter.patient}
         onConsentSaved={handleConsentSaved}
       />
+      </EncounterSection>
 
-      <section className="rounded-lg border p-6">
+      <EncounterSection
+        sectionId="consent-records"
+        title="Consent Records"
+        status={consents.length ? `${consents.length} recorded` : "Not started"}
+        open={openSections.has("consent-records")}
+        onToggle={() => toggleSection("consent-records")}
+      >
+      <div className="rounded-lg p-1 sm:p-2">
         <h2 className="mb-4 text-xl font-semibold">Consent Records</h2>
 
         {consents.length === 0 ? (
@@ -721,10 +886,18 @@ export default function EncounterDetailPage({ params }: Props) {
             ))}
           </div>
         )}
-      </section>
+      </div>
+      </EncounterSection>
 
       {encounter.programme === "ocular_diagnostics" ||
       encounter.programme === "combined_assessment" ? (
+        <EncounterSection
+          sectionId="ocular-assessment"
+          title="General Ocular Clinical Record"
+          status={encounter.ocular_assessment ? "In progress" : "Not started"}
+          open={openSections.has("ocular-assessment")}
+          onToggle={() => toggleSection("ocular-assessment")}
+        >
         <OcularAssessmentForm
           encounterId={encounter.id}
           initial={encounter.ocular_assessment}
@@ -736,10 +909,18 @@ export default function EncounterDetailPage({ params }: Props) {
           fundusUploads={uploads}
           ocularInvestigations={ocularInvestigations}
         />
+        </EncounterSection>
       ) : null}
 
       {encounter.programme === "ocular_diagnostics" ||
       encounter.programme === "combined_assessment" ? (
+        <EncounterSection
+          sectionId="ocular-investigations"
+          title="Additional Ocular Investigations and Sentinel AI Clinical Review"
+          status={ocularInvestigations.length ? `${ocularInvestigations.length} investigation${ocularInvestigations.length === 1 ? "" : "s"}` : "Not started"}
+          open={openSections.has("ocular-investigations")}
+          onToggle={() => toggleSection("ocular-investigations")}
+        >
         <OcularInvestigationsAIReview
           encounterId={encounter.id}
           assessment={encounter.ocular_assessment}
@@ -748,9 +929,17 @@ export default function EncounterDetailPage({ params }: Props) {
             image_file: resolveFileUrl(upload.image_file),
           }))}
         />
+        </EncounterSection>
       ) : null}
 
-      <section className="rounded-lg border p-6">
+      <EncounterSection
+        sectionId="retinal-report"
+        title="Optometrist Report: Diabetic Grading"
+        status={reports[0]?.report_status ? displayValue(reports[0].report_status) : "Not started"}
+        open={openSections.has("retinal-report")}
+        onToggle={() => toggleSection("retinal-report")}
+      >
+      <div className="rounded-lg p-1 sm:p-2">
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Optometrist Report: Diabetic Grading</h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -771,9 +960,17 @@ export default function EncounterDetailPage({ params }: Props) {
           fundusUploads={uploads}
           ocularInvestigations={ocularInvestigations}
         />
-      </section>
+      </div>
+      </EncounterSection>
 
-      <section className="rounded-lg border p-6">
+      <EncounterSection
+        sectionId="structured-reports"
+        title="Structured Reports"
+        status={reports.length ? `${reports.length} report${reports.length === 1 ? "" : "s"}` : "Not started"}
+        open={openSections.has("structured-reports")}
+        onToggle={() => toggleSection("structured-reports")}
+      >
+      <div className="rounded-lg p-1 sm:p-2">
         <h2 className="mb-4 text-xl font-semibold">Structured Reports</h2>
 
         {reports.length === 0 ? (
@@ -876,14 +1073,23 @@ export default function EncounterDetailPage({ params }: Props) {
             ))}
           </div>
         )}
-      </section>
+      </div>
+      </EncounterSection>
 
+      <EncounterSection
+        sectionId="onward-referral"
+        title="Onward ophthalmology referral"
+        open={openSections.has("onward-referral")}
+        onToggle={() => toggleSection("onward-referral")}
+      >
       <OnwardReferralManager
         encounterId={encounter.id}
         encounterReference={encounter.encounter_id}
         patientPhone={patient.phone || ""}
         user={currentUser}
       />
+      </EncounterSection>
+      </div>
     </main>
   );
 }
