@@ -137,11 +137,20 @@ export default function EncounterDetailPage({ params }: Props) {
     dilation_drops_used: "",
     dilation_notes: "",
   });
+  const [clinicalIntakeForm, setClinicalIntakeForm] = useState({
+    diabetes_duration: "",
+    symptoms_notes: "",
+    clinical_notes: "",
+  });
 
   const [savingMeasurements, setSavingMeasurements] = useState(false);
   const [measurementMessage, setMeasurementMessage] = useState("");
   const [measurementMessageType, setMeasurementMessageType] =
     useState<"success" | "error" | "info">("info");
+  const [savingClinicalIntake, setSavingClinicalIntake] = useState(false);
+  const [clinicalIntakeMessage, setClinicalIntakeMessage] = useState("");
+  const [clinicalIntakeMessageType, setClinicalIntakeMessageType] =
+    useState<"success" | "error">("success");
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set());
   const deepLinkHandled = useRef(false);
 
@@ -187,6 +196,11 @@ export default function EncounterDetailPage({ params }: Props) {
     ]);
 
     setEncounter(encounterData);
+    setClinicalIntakeForm({
+      diabetes_duration: encounterData.diabetes_duration || "",
+      symptoms_notes: encounterData.symptoms_notes || "",
+      clinical_notes: encounterData.clinical_notes || "",
+    });
 
     setMeasurementForm({
       left_unaided_va: e.left_unaided_va || "",
@@ -336,6 +350,39 @@ export default function EncounterDetailPage({ params }: Props) {
     setMeasurementForm((current) => ({ ...current, [field]: value }));
   }
 
+  function handleClinicalIntakeChange(
+    field: keyof typeof clinicalIntakeForm,
+    value: string
+  ) {
+    setClinicalIntakeForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSaveClinicalIntake() {
+    if (!encounter?.id) return;
+
+    try {
+      setSavingClinicalIntake(true);
+      setClinicalIntakeMessage("");
+      const updatedEncounter = await updateEncounter(encounter.id, clinicalIntakeForm);
+      setEncounter(updatedEncounter);
+      setClinicalIntakeForm({
+        diabetes_duration: updatedEncounter.diabetes_duration || "",
+        symptoms_notes: updatedEncounter.symptoms_notes || "",
+        clinical_notes: updatedEncounter.clinical_notes || "",
+      });
+      setClinicalIntakeMessageType("success");
+      setClinicalIntakeMessage("Clinical intake saved successfully.");
+    } catch (err) {
+      setClinicalIntakeMessageType("error");
+      setClinicalIntakeMessage(
+        err instanceof Error ? err.message : "Failed to save clinical intake."
+      );
+      expandSection("clinical-intake", true);
+    } finally {
+      setSavingClinicalIntake(false);
+    }
+  }
+
   async function handleSaveMeasurements() {
     if (!encounter?.id) return;
 
@@ -381,6 +428,12 @@ export default function EncounterDetailPage({ params }: Props) {
 
 
   const canDeleteUploads = hasAnyRole(currentUser, ALLOWED_DELETE_UPLOAD_ROLES);
+  const canEditClinicalIntake = Boolean(
+    currentUser &&
+      !currentUser.is_superuser &&
+      currentUser.organization?.organization_type === "clinic" &&
+      currentUser.roles?.some((role) => role === "optometrist" || role === "reviewer")
+  );
 
   const encounterAny: any = encounter;
 
@@ -477,6 +530,104 @@ export default function EncounterDetailPage({ params }: Props) {
       ) : null}
 
       <div className="space-y-3" aria-label="Encounter workflow sections">
+      <EncounterSection
+        sectionId="clinical-intake"
+        title="Clinical Intake"
+        open={openSections.has("clinical-intake")}
+        onToggle={() => toggleSection("clinical-intake")}
+      >
+        <div className="space-y-4 rounded-lg p-1 sm:p-2">
+          <div>
+            <h2 className="text-xl font-semibold">Clinical Intake</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Review the assessment history recorded when this encounter was created.
+            </p>
+          </div>
+
+          {clinicalIntakeMessage ? (
+            <div
+              role={clinicalIntakeMessageType === "error" ? "alert" : "status"}
+              className={`rounded-lg border p-3 text-sm font-medium ${
+                clinicalIntakeMessageType === "error"
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-800"
+              }`}
+            >
+              {clinicalIntakeMessage}
+            </div>
+          ) : null}
+
+          {canEditClinicalIntake ? (
+            <div className="grid gap-4">
+              {encounter.programme !== "ocular_diagnostics" || clinicalIntakeForm.diabetes_duration ? (
+                <label className="space-y-1">
+                  <span className="text-sm font-medium">Diabetes duration</span>
+                  <input
+                    value={clinicalIntakeForm.diabetes_duration}
+                    onChange={(event) => handleClinicalIntakeChange("diabetes_duration", event.target.value)}
+                    className="w-full rounded-lg border px-3 py-2"
+                    placeholder="Not recorded"
+                  />
+                </label>
+              ) : null}
+              <label className="space-y-1">
+                <span className="text-sm font-medium">Symptoms / intake notes</span>
+                <textarea
+                  value={clinicalIntakeForm.symptoms_notes}
+                  onChange={(event) => handleClinicalIntakeChange("symptoms_notes", event.target.value)}
+                  className="w-full rounded-lg border px-3 py-2"
+                  rows={3}
+                  placeholder="Not recorded"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium">Clinical notes</span>
+                <textarea
+                  value={clinicalIntakeForm.clinical_notes}
+                  onChange={(event) => handleClinicalIntakeChange("clinical_notes", event.target.value)}
+                  className="w-full rounded-lg border px-3 py-2"
+                  rows={3}
+                  placeholder="Not recorded"
+                />
+              </label>
+              <div>
+                <button
+                  type="button"
+                  onClick={handleSaveClinicalIntake}
+                  disabled={savingClinicalIntake}
+                  className="rounded-lg bg-blue-700 px-4 py-2 font-medium text-white disabled:opacity-60"
+                >
+                  {savingClinicalIntake ? "Saving..." : "Save clinical intake"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <dl className="grid gap-4 text-sm md:grid-cols-2">
+              {encounter.programme !== "ocular_diagnostics" || clinicalIntakeForm.diabetes_duration ? (
+                <div>
+                  <dt className="font-medium text-slate-700">Diabetes duration</dt>
+                  <dd className="mt-1 whitespace-pre-wrap text-slate-950">
+                    {clinicalIntakeForm.diabetes_duration || "Not recorded"}
+                  </dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className="font-medium text-slate-700">Symptoms / intake notes</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-slate-950">
+                  {clinicalIntakeForm.symptoms_notes || "Not recorded"}
+                </dd>
+              </div>
+              <div className="md:col-span-2">
+                <dt className="font-medium text-slate-700">Clinical notes</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-slate-950">
+                  {clinicalIntakeForm.clinical_notes || "Not recorded"}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+      </EncounterSection>
+
       <EncounterSection
         sectionId="technician"
         title="Technician Capture: VA, IOP and Dilation"
