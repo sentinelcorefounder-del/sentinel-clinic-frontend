@@ -13,6 +13,7 @@ import {
   updatePatient,
   deleteImageUpload,
   fetchOcularInvestigations,
+  correctEncounterServicePackage,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter, OcularInvestigation } from "@/types/encounter";
@@ -26,6 +27,7 @@ import OcularAssessmentForm from "@/components/OcularAssessmentForm";
 import OcularInvestigationsAIReview from "@/components/OcularInvestigationsAIReview";
 import RemidioMobileTransfer from "@/components/RemidioMobileTransfer";
 import OnwardReferralManager from "@/components/OnwardReferralManager";
+import EyeHealthScreeningReportForm from "@/components/EyeHealthScreeningReportForm";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -142,6 +144,10 @@ export default function EncounterDetailPage({ params }: Props) {
     symptoms_notes: "",
     clinical_notes: "",
   });
+  const [packageReason, setPackageReason] = useState("");
+  const [packageChoice, setPackageChoice] = useState("");
+  const [diabeticConfirmed, setDiabeticConfirmed] = useState(false);
+  const [packageMessage, setPackageMessage] = useState("");
 
   const [savingMeasurements, setSavingMeasurements] = useState(false);
   const [measurementMessage, setMeasurementMessage] = useState("");
@@ -434,6 +440,24 @@ export default function EncounterDetailPage({ params }: Props) {
       currentUser.organization?.organization_type === "clinic" &&
       currentUser.roles?.some((role) => role === "optometrist" || role === "reviewer")
   );
+  const canCorrectPackage = canEditClinicalIntake && !encounter?.service_package_locked;
+  const includesDiabetic = encounter?.service_package
+    ? ["diabetic_retinal_assessment", "combined_diabetic_eye_health"].includes(encounter.service_package)
+    : ["diabetic_screening", "combined_assessment"].includes(encounter?.programme || "");
+  const includesEyeHealth = encounter?.service_package
+    ? ["eye_health_screening", "combined_diabetic_eye_health"].includes(encounter.service_package)
+    : encounter?.programme === "combined_assessment";
+  const isComprehensiveOcular = encounter?.service_package
+    ? encounter.service_package === "comprehensive_ocular_assessment"
+    : encounter?.programme === "ocular_diagnostics";
+
+  async function savePackageCorrection() {
+    if (!encounter || !packageChoice || !packageReason.trim()) return setPackageMessage("Choose a package and enter a correction reason.");
+    try {
+      const updated = await correctEncounterServicePackage(encounter.id, { service_package: packageChoice, reason: packageReason.trim(), diabetic_confirmed: diabeticConfirmed });
+      setEncounter(updated); setPackageMessage("Service package corrected and audited."); setPackageReason("");
+    } catch (value) { setPackageMessage(value instanceof Error ? value.message : "Correction failed."); }
+  }
 
   const encounterAny: any = encounter;
 
@@ -459,11 +483,7 @@ export default function EncounterDetailPage({ params }: Props) {
         <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row">
           <div>
             <h1 className="text-2xl font-bold">
-              {encounter.programme === "ocular_diagnostics"
-                ? "General Ocular Assessment"
-                : encounter.programme === "combined_assessment"
-                  ? "Combined Diabetic and Ocular Assessment"
-                  : "Diabetic Retinal Assessment"}
+              {displayValue(encounter.service_package || encounter.programme)}
             </h1>
             <p className="mt-1 text-sm text-gray-600">
               Technician capture and programme-specific clinical reporting.
@@ -502,6 +522,8 @@ export default function EncounterDetailPage({ params }: Props) {
           <p>
             <strong>Programme:</strong> {displayValue(encounter.programme)}
           </p>
+          <p><strong>Service package:</strong> {displayValue(encounter.service_package || "Historical — confirmation required")}</p>
+          <p><strong>Assessment location:</strong> {[encounter.assessment_location_snapshot?.site_name, encounter.assessment_location_snapshot?.address].filter(Boolean).join(" · ") || "Not recorded"}</p>
           <p>
             <strong>Consent Status:</strong> {patient.consent_status || "-"}
           </p>
@@ -530,6 +552,9 @@ export default function EncounterDetailPage({ params }: Props) {
       ) : null}
 
       <div className="space-y-3" aria-label="Encounter workflow sections">
+      <EncounterSection sectionId="service-package" title="Service Package" status={encounter.service_package ? "Recorded" : "Attention required"} open={openSections.has("service-package")} onToggle={() => toggleSection("service-package")}>
+        <div className="space-y-3"><p><strong>Current:</strong> {displayValue(encounter.service_package || "Historical ocular classification not confirmed")}</p>{canCorrectPackage ? <><select value={packageChoice} onChange={(event) => setPackageChoice(event.target.value)} className="w-full rounded border p-2"><option value="">Select corrected package</option><option value="diabetic_retinal_assessment">Diabetic retinal assessment</option><option value="eye_health_screening">Eye-health screening</option><option value="combined_diabetic_eye_health">Combined diabetic and eye-health screening</option><option value="comprehensive_ocular_assessment">Comprehensive ocular assessment</option></select><textarea value={packageReason} onChange={(event) => setPackageReason(event.target.value)} placeholder="Required correction reason" className="w-full rounded border p-2"/><label className="flex gap-2 text-sm"><input type="checkbox" checked={diabeticConfirmed} onChange={(event) => setDiabeticConfirmed(event.target.checked)}/>Patient diabetes status confirmed when changing ocular to combined</label><button onClick={() => void savePackageCorrection()} className="rounded bg-slate-900 px-4 py-2 font-semibold text-white">Correct service package</button></> : <p className="text-sm text-slate-600">Package correction requires performing-clinic optometrist/reviewer authority and an unfinalized report.</p>}{packageMessage && <p className="text-sm">{packageMessage}</p>}</div>
+      </EncounterSection>
       <EncounterSection
         sectionId="clinical-intake"
         title="Clinical Intake"
@@ -559,7 +584,7 @@ export default function EncounterDetailPage({ params }: Props) {
 
           {canEditClinicalIntake ? (
             <div className="grid gap-4">
-              {encounter.programme !== "ocular_diagnostics" || clinicalIntakeForm.diabetes_duration ? (
+              {includesDiabetic || clinicalIntakeForm.diabetes_duration ? (
                 <label className="space-y-1">
                   <span className="text-sm font-medium">Diabetes duration</span>
                   <input
@@ -603,7 +628,7 @@ export default function EncounterDetailPage({ params }: Props) {
             </div>
           ) : (
             <dl className="grid gap-4 text-sm md:grid-cols-2">
-              {encounter.programme !== "ocular_diagnostics" || clinicalIntakeForm.diabetes_duration ? (
+              {includesDiabetic || clinicalIntakeForm.diabetes_duration ? (
                 <div>
                   <dt className="font-medium text-slate-700">Diabetes duration</dt>
                   <dd className="mt-1 whitespace-pre-wrap text-slate-950">
@@ -922,7 +947,7 @@ export default function EncounterDetailPage({ params }: Props) {
                     className="w-full rounded border"
                   />
 
-                  {encounter.programme !== "ocular_diagnostics" ? (
+                  {includesDiabetic ? (
                   <div className="rounded-lg border bg-slate-50 p-4">
                     <h3 className="mb-3 text-lg font-semibold">AI Suggestion</h3>
 
@@ -1040,8 +1065,7 @@ export default function EncounterDetailPage({ params }: Props) {
       </div>
       </EncounterSection>
 
-      {encounter.programme === "ocular_diagnostics" ||
-      encounter.programme === "combined_assessment" ? (
+      {isComprehensiveOcular ? (
         <EncounterSection
           sectionId="ocular-assessment"
           title="General Ocular Clinical Record"
@@ -1063,8 +1087,7 @@ export default function EncounterDetailPage({ params }: Props) {
         </EncounterSection>
       ) : null}
 
-      {encounter.programme === "ocular_diagnostics" ||
-      encounter.programme === "combined_assessment" ? (
+      {isComprehensiveOcular || includesEyeHealth ? (
         <EncounterSection
           sectionId="ocular-investigations"
           title="Additional Ocular Investigations and Sentinel AI Clinical Review"
@@ -1083,7 +1106,7 @@ export default function EncounterDetailPage({ params }: Props) {
         </EncounterSection>
       ) : null}
 
-      <EncounterSection
+      {includesDiabetic ? <EncounterSection
         sectionId="retinal-report"
         title="Optometrist Report: Diabetic Grading"
         status={reports[0]?.report_status ? displayValue(reports[0].report_status) : "Not started"}
@@ -1112,9 +1135,24 @@ export default function EncounterDetailPage({ params }: Props) {
           ocularInvestigations={ocularInvestigations}
         />
       </div>
-      </EncounterSection>
+      </EncounterSection> : null}
 
-      <EncounterSection
+      {includesEyeHealth ? <EncounterSection
+        sectionId="eye-health-report"
+        title="Eye Health Screening Report"
+        open={openSections.has("eye-health-report")}
+        onToggle={() => toggleSection("eye-health-report")}
+      >
+        <EyeHealthScreeningReportForm
+          encounterId={encounter.id}
+          uploads={uploads}
+          investigations={ocularInvestigations}
+          canEdit={canEditClinicalIntake}
+          combined={encounter.service_package === "combined_diabetic_eye_health"}
+        />
+      </EncounterSection> : null}
+
+      {includesDiabetic ? <EncounterSection
         sectionId="structured-reports"
         title="Structured Reports"
         status={reports.length ? `${reports.length} report${reports.length === 1 ? "" : "s"}` : "Not started"}
@@ -1225,7 +1263,7 @@ export default function EncounterDetailPage({ params }: Props) {
           </div>
         )}
       </div>
-      </EncounterSection>
+      </EncounterSection> : null}
 
       <EncounterSection
         sectionId="onward-referral"

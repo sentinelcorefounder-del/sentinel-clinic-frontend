@@ -285,6 +285,69 @@ export async function updateEncounter(id: string | number, data: any) {
   return responseData;
 }
 
+export async function correctEncounterServicePackage(id: string | number, data: {
+  service_package: string; reason: string; diabetic_confirmed?: boolean;
+}) {
+  const res = await fetch(`${API_URL}/encounters/${id}/service-package/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to correct service package."));
+  return responseData;
+}
+
+export async function fetchEyeHealthReport(encounterId: string | number) {
+  const res = await fetch(`${API_URL}/reports/eye-health/encounter/${encounterId}/`, {
+    cache: "no-store", credentials: "include",
+  });
+  if (res.status === 404) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load eye-health report."));
+  return data as import("@/types/report").EyeHealthScreeningReport;
+}
+
+export async function saveEyeHealthReport(encounterId: string | number, data: Record<string, unknown>, expectedVersion?: number) {
+  const res = await fetch(`${API_URL}/reports/eye-health/encounter/${encounterId}/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ ...data, ...(expectedVersion === undefined ? {} : { expected_version: expectedVersion }) }),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to save eye-health report."));
+  return responseData as import("@/types/report").EyeHealthScreeningReport;
+}
+
+export async function previewEyeHealthReport(reportId: number) {
+  const res = await fetch(`${API_URL}/reports/eye-health/${reportId}/preview/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: "{}",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(data, "Failed to preview eye-health report."));
+  }
+  return res.blob();
+}
+
+export async function finalizeEyeHealthReport(reportId: number, expectedVersion: number) {
+  const res = await fetch(`${API_URL}/reports/eye-health/${reportId}/finalize/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ expected_version: expectedVersion, signoff_confirmed: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to finalize eye-health report."));
+  return data as import("@/types/report").EyeHealthScreeningReport;
+}
+
+export async function startEyeHealthReportCorrection(reportId: number, reason: string) {
+  const res = await fetch(`${API_URL}/reports/eye-health/${reportId}/correction/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ reason }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to start report correction."));
+  return data as import("@/types/report").EyeHealthScreeningReport;
+}
+
 export async function updateOcularAssessment(
   encounterId: string | number,
   data: any

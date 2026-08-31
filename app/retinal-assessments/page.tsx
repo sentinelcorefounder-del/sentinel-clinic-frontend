@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchEncounters, fetchMyOrganizationCapabilities } from "@/lib/api";
-import type { AssessmentProgramme } from "@/types/encounter";
+import { fetchEncounters, fetchMyOrganizationCapabilities, type OrganizationCapabilityProfile } from "@/lib/api";
+import type { AssessmentProgramme, Encounter } from "@/types/encounter";
 
 type PathwayFilter = "all" | AssessmentProgramme;
 
@@ -15,6 +15,10 @@ const pathwayDetails: Record<
   diabetic_screening: {
     label: "Diabetic",
     classes: "bg-blue-100 text-blue-800",
+  },
+  eye_health_screening: {
+    label: "Eye health",
+    classes: "bg-cyan-100 text-cyan-800",
   },
   ocular_diagnostics: {
     label: "Ocular",
@@ -45,8 +49,8 @@ function PathwayBadge({ programme }: { programme: AssessmentProgramme }) {
 }
 
 export default function RetinalAssessmentsPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
+  const [rows, setRows] = useState<Encounter[]>([]);
+  const [profile, setProfile] = useState<OrganizationCapabilityProfile | null>(null);
   const [source, setSource] = useState("all");
   const [pathway, setPathway] = useState<PathwayFilter>("all");
   const [error, setError] = useState("");

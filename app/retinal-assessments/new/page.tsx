@@ -17,7 +17,9 @@ import type {
   EncounterSourceType,
   EncounterWorkflowRoute,
   AssessmentProgramme,
+  ServicePackage,
 } from "@/types/encounter";
+import type { Patient } from "@/types/patient";
 
 type PatientMode = "existing" | "new";
 
@@ -55,7 +57,7 @@ export default function NewRetinalAssessmentPage() {
 
   const [profile, setProfile] =
     useState<OrganizationCapabilityProfile | null>(null);
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [mode, setMode] = useState<PatientMode>("existing");
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [activeReferrals, setActiveReferrals] =
@@ -69,11 +71,16 @@ export default function NewRetinalAssessmentPage() {
     useState<EncounterWorkflowRoute>("clinic_managed");
   const [programme, setProgramme] =
     useState<AssessmentProgramme>("diabetic_screening");
+  const [servicePackage, setServicePackage] =
+    useState<ServicePackage>("diabetic_retinal_assessment");
 
   const [assessmentDate, setAssessmentDate] = useState(today());
   const [diabetesDuration, setDiabetesDuration] = useState("");
   const [symptomsNotes, setSymptomsNotes] = useState("");
   const [clinicalNotes, setClinicalNotes] = useState("");
+  const [locationType, setLocationType] = useState<"clinic" | "hospital" | "mobile">("clinic");
+  const [locationName, setLocationName] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
 
   const [newPatient, setNewPatient] = useState<NewPatientForm>({
     first_name: "",
@@ -176,6 +183,16 @@ export default function NewRetinalAssessmentPage() {
     }
   }, [programme]);
 
+  function chooseServicePackage(value: ServicePackage) {
+    setServicePackage(value);
+    setProgramme({
+      diabetic_retinal_assessment: "diabetic_screening",
+      eye_health_screening: "eye_health_screening",
+      combined_diabetic_eye_health: "combined_assessment",
+      comprehensive_ocular_assessment: "ocular_diagnostics",
+    }[value] as AssessmentProgramme);
+  }
+
   function updateNewPatient(
     field: keyof NewPatientForm,
     value: string
@@ -210,6 +227,9 @@ export default function NewRetinalAssessmentPage() {
 
       if (!patientId) {
         throw new Error("Select or create a patient.");
+      }
+      if (locationType !== "clinic" && !locationName.trim()) {
+        throw new Error("Enter the assessment site/location name.");
       }
 
       if (
@@ -255,6 +275,10 @@ export default function NewRetinalAssessmentPage() {
               ? "combined_assessment"
               : "retinal_assessment",
         programme,
+        service_package: servicePackage,
+        assessment_location_type: locationType,
+        assessment_location_name: locationName.trim(),
+        assessment_location_address: locationAddress.trim(),
         source_type: effectiveSource,
         hospital_referral:
           effectiveSource === "hospital_referral"
@@ -311,21 +335,22 @@ export default function NewRetinalAssessmentPage() {
         <h2 className="mb-4 text-lg font-semibold">Assessment type</h2>
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            ["diabetic_screening", "Diabetic Retinal Assessment", "Sentinel diabetic grading and report workflow."],
-            ["ocular_diagnostics", "General Ocular Assessment", "Clinic-owned assessment for non-diabetic ocular care."],
-            ["combined_assessment", "Combined Assessment", "Diabetic screening plus a separate ocular clinical record."],
+            ["diabetic_retinal_assessment", "Diabetic retinal assessment", "Existing diabetic grading and report workflow."],
+            ["eye_health_screening", "Eye-health screening", "Targeted patient-facing eye-health screening."],
+            ["combined_diabetic_eye_health", "Combined diabetic and eye-health screening", "Existing diabetic report plus an eye-health screening report."],
+            ["comprehensive_ocular_assessment", "Comprehensive ocular assessment", "Detailed clinic-owned ocular case-file workflow."],
           ].map(([value, title, description]) => {
             const disabled =
-              value !== "diabetic_screening" &&
+              value !== "diabetic_retinal_assessment" &&
               !profile?.ocular_diagnostics_enabled;
             return (
               <button
                 key={value}
                 type="button"
                 disabled={disabled}
-                onClick={() => setProgramme(value as AssessmentProgramme)}
+                onClick={() => chooseServicePackage(value as ServicePackage)}
                 className={`rounded-xl border p-4 text-left ${
-                  programme === value
+                  servicePackage === value
                     ? "border-blue-700 bg-blue-50"
                     : "bg-white"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
@@ -390,7 +415,7 @@ export default function NewRetinalAssessmentPage() {
           </select>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
-            {[
+            {([
               ["first_name", "First name"],
               ["last_name", "Last name"],
               ["date_of_birth", "Date of birth"],
@@ -400,7 +425,7 @@ export default function NewRetinalAssessmentPage() {
               ["city", "City"],
               ["state", "State"],
               ["country", "Country"],
-            ].map(([field, label]) => (
+            ] as Array<[keyof NewPatientForm, string]>).map(([field, label]) => (
               <label key={field}>
                 <span className="mb-1 block text-sm font-medium">
                   {label}
@@ -413,10 +438,10 @@ export default function NewRetinalAssessmentPage() {
                         ? "email"
                         : "text"
                   }
-                  value={(newPatient as any)[field]}
+                  value={newPatient[field]}
                   onChange={(event) =>
                     updateNewPatient(
-                      field as keyof NewPatientForm,
+                      field,
                       event.target.value
                     )
                   }
@@ -542,7 +567,7 @@ export default function NewRetinalAssessmentPage() {
           3. Assessment Setup
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {programme !== "ocular_diagnostics" ? <label>
+          <label>
             <span className="mb-1 block text-sm font-medium">
               Assessment date
             </span>
@@ -554,8 +579,8 @@ export default function NewRetinalAssessmentPage() {
               }
               className="w-full rounded-xl border p-3"
             />
-          </label> : null}
-          <label>
+          </label>
+          {["diabetic_retinal_assessment", "combined_diabetic_eye_health"].includes(servicePackage) ? <label>
             <span className="mb-1 block text-sm font-medium">
               Diabetes duration
             </span>
@@ -566,6 +591,20 @@ export default function NewRetinalAssessmentPage() {
               }
               className="w-full rounded-xl border p-3"
             />
+          </label> : null}
+          <label>
+            <span className="mb-1 block text-sm font-medium">Location type</span>
+            <select value={locationType} onChange={(event) => setLocationType(event.target.value as typeof locationType)} className="w-full rounded-xl border p-3">
+              <option value="clinic">Clinic</option><option value="hospital">Hospital</option><option value="mobile">Mobile / client site</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-sm font-medium">Site / location name</span>
+            <input value={locationName} onChange={(event) => setLocationName(event.target.value)} placeholder={locationType === "clinic" ? "Leave blank to use the assigned clinic branch" : "Required"} className="w-full rounded-xl border p-3" />
+          </label>
+          <label className="md:col-span-2">
+            <span className="mb-1 block text-sm font-medium">Address or short location description</span>
+            <input value={locationAddress} onChange={(event) => setLocationAddress(event.target.value)} className="w-full rounded-xl border p-3" />
           </label>
         </div>
 

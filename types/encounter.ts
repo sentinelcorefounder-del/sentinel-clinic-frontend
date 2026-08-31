@@ -8,8 +8,15 @@ export type EncounterWorkflowRoute =
 
 export type AssessmentProgramme =
   | "diabetic_screening"
+  | "eye_health_screening"
   | "ocular_diagnostics"
   | "combined_assessment";
+
+export type ServicePackage =
+  | "diabetic_retinal_assessment"
+  | "eye_health_screening"
+  | "combined_diabetic_eye_health"
+  | "comprehensive_ocular_assessment";
 
 export type ActiveHospitalReferral = {
   id: number;
@@ -36,6 +43,16 @@ export type Encounter = {
   encounter_date: string;
   encounter_type: string;
   programme: AssessmentProgramme;
+  service_package: ServicePackage | null;
+  service_package_locked?: boolean;
+  assessment_location_snapshot: {
+    location_type?: string;
+    site_name?: string;
+    address?: string;
+    branch_id?: number | null;
+    branch_code?: string;
+    branch_name?: string;
+  };
   source_type: EncounterSourceType;
   workflow_route: EncounterWorkflowRoute;
   payment_responsibility: string;

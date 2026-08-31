@@ -9,12 +9,13 @@ import {
 } from "@/lib/patients-api";
 import { fetchEncounters } from "@/lib/api";
 import type { Patient } from "@/types/patient";
-import type { AssessmentProgramme } from "@/types/encounter";
+import type { AssessmentProgramme, Encounter } from "@/types/encounter";
 
 type PathwayFilter = "all" | AssessmentProgramme;
 
 const pathwayLabels: Record<AssessmentProgramme, string> = {
   diabetic_screening: "Diabetic",
+  eye_health_screening: "Eye health",
   ocular_diagnostics: "Ocular",
   combined_assessment: "Combined",
 };
@@ -28,7 +29,7 @@ type HospitalLabel = {
 export default function PatientsTable() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
-  const [encounters, setEncounters] = useState<any[]>([]);
+  const [encounters, setEncounters] = useState<Encounter[]>([]);
   const [search, setSearch] = useState("");
   const [source, setSource] =
     useState<PatientSourceFilter>("all");
