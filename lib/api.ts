@@ -303,7 +303,7 @@ export async function fetchEyeHealthReport(encounterId: string | number) {
   });
   if (res.status === 404) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(data, "Failed to load eye-health report."));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load targeted screening report."));
   return data as import("@/types/report").EyeHealthScreeningReport;
 }
 
@@ -313,17 +313,18 @@ export async function saveEyeHealthReport(encounterId: string | number, data: Re
     body: JSON.stringify({ ...data, ...(expectedVersion === undefined ? {} : { expected_version: expectedVersion }) }),
   });
   const responseData = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to save eye-health report."));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to save targeted screening report."));
   return responseData as import("@/types/report").EyeHealthScreeningReport;
 }
 
-export async function previewEyeHealthReport(reportId: number) {
+export async function previewEyeHealthReport(reportId: number, reportFormat: "patient" | "clinician") {
   const res = await fetch(`${API_URL}/reports/eye-health/${reportId}/preview/`, {
-    method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: "{}",
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true),
+    body: JSON.stringify({ report_format: reportFormat }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(formatApiError(data, "Failed to preview eye-health report."));
+    throw new Error(formatApiError(data, "Failed to preview targeted screening report."));
   }
   return res.blob();
 }
@@ -334,7 +335,7 @@ export async function finalizeEyeHealthReport(reportId: number, expectedVersion:
     body: JSON.stringify({ expected_version: expectedVersion, signoff_confirmed: true }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(data, "Failed to finalize eye-health report."));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to finalize targeted screening report."));
   return data as import("@/types/report").EyeHealthScreeningReport;
 }
 
@@ -1273,6 +1274,7 @@ export async function clinicIssueReport(reportId: string | number, signature: { 
 
 
 export type DistributionQueueItem = {
+  kind: "diabetic" | "targeted";
   id: number;
   report_id: string;
   patient_id: string;
@@ -1317,10 +1319,13 @@ export async function fetchDistributionQueue(params?: {
 
 export async function releaseReportToHospital(
   reportId: string | number,
-  expectedVersion: number
+  expectedVersion: number,
+  kind: "diabetic" | "targeted" = "diabetic"
 ) {
   const res = await fetch(
-    `${API_URL}/ops/distribution/${reportId}/release-hospital/`,
+    kind === "targeted"
+      ? `${API_URL}/reports/eye-health/${reportId}/release-hospital/`
+      : `${API_URL}/ops/distribution/${reportId}/release-hospital/`,
     {
       method: "POST",
       credentials: "include",

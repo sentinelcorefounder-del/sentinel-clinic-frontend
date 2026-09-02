@@ -15,7 +15,7 @@ type PathwayFilter = "all" | AssessmentProgramme;
 
 const pathwayLabels: Record<AssessmentProgramme, string> = {
   diabetic_screening: "Diabetic",
-  eye_health_screening: "Eye health",
+  eye_health_screening: "Targeted retinal / glaucoma risk",
   ocular_diagnostics: "Ocular",
   combined_assessment: "Combined",
 };

@@ -17,7 +17,7 @@ const pathwayDetails: Record<
     classes: "bg-blue-100 text-blue-800",
   },
   eye_health_screening: {
-    label: "Eye health",
+    label: "Targeted retinal / glaucoma risk",
     classes: "bg-cyan-100 text-cyan-800",
   },
   ocular_diagnostics: {

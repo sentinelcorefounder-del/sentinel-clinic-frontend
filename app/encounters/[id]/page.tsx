@@ -43,6 +43,15 @@ function displayValue(value?: string | null) {
   return value.replaceAll("_", " ");
 }
 
+function servicePackageLabel(value?: string | null) {
+  return ({
+    diabetic_retinal_assessment: "Diabetic Retinal Assessment",
+    eye_health_screening: "Targeted Retinal and Glaucoma-Risk Screening",
+    combined_diabetic_eye_health: "Combined Diabetic Retinal Assessment and Targeted Glaucoma-Risk Screening",
+    comprehensive_ocular_assessment: "Comprehensive Ocular Assessment",
+  } as Record<string, string>)[value || ""] || "Historical ocular classification not confirmed";
+}
+
 function displayProvider(provider?: string | null) {
   if (provider === "openai") return "OpenAI";
   if (provider === "hybrid") return "Hybrid AI";
@@ -553,7 +562,7 @@ export default function EncounterDetailPage({ params }: Props) {
 
       <div className="space-y-3" aria-label="Encounter workflow sections">
       <EncounterSection sectionId="service-package" title="Service Package" status={encounter.service_package ? "Recorded" : "Attention required"} open={openSections.has("service-package")} onToggle={() => toggleSection("service-package")}>
-        <div className="space-y-3"><p><strong>Current:</strong> {displayValue(encounter.service_package || "Historical ocular classification not confirmed")}</p>{canCorrectPackage ? <><select value={packageChoice} onChange={(event) => setPackageChoice(event.target.value)} className="w-full rounded border p-2"><option value="">Select corrected package</option><option value="diabetic_retinal_assessment">Diabetic retinal assessment</option><option value="eye_health_screening">Eye-health screening</option><option value="combined_diabetic_eye_health">Combined diabetic and eye-health screening</option><option value="comprehensive_ocular_assessment">Comprehensive ocular assessment</option></select><textarea value={packageReason} onChange={(event) => setPackageReason(event.target.value)} placeholder="Required correction reason" className="w-full rounded border p-2"/><label className="flex gap-2 text-sm"><input type="checkbox" checked={diabeticConfirmed} onChange={(event) => setDiabeticConfirmed(event.target.checked)}/>Patient diabetes status confirmed when changing ocular to combined</label><button onClick={() => void savePackageCorrection()} className="rounded bg-slate-900 px-4 py-2 font-semibold text-white">Correct service package</button></> : <p className="text-sm text-slate-600">Package correction requires performing-clinic optometrist/reviewer authority and an unfinalized report.</p>}{packageMessage && <p className="text-sm">{packageMessage}</p>}</div>
+        <div className="space-y-3"><p><strong>Current:</strong> {servicePackageLabel(encounter.service_package)}</p>{canCorrectPackage ? <><select value={packageChoice} onChange={(event) => setPackageChoice(event.target.value)} className="w-full rounded border p-2"><option value="">Select corrected package</option><option value="diabetic_retinal_assessment">Diabetic Retinal Assessment</option><option value="eye_health_screening">Targeted Retinal and Glaucoma-Risk Screening</option><option value="combined_diabetic_eye_health">Combined Diabetic Retinal Assessment and Targeted Glaucoma-Risk Screening</option><option value="comprehensive_ocular_assessment">Comprehensive Ocular Assessment</option></select><textarea value={packageReason} onChange={(event) => setPackageReason(event.target.value)} placeholder="Required correction reason" className="w-full rounded border p-2"/><label className="flex gap-2 text-sm"><input type="checkbox" checked={diabeticConfirmed} onChange={(event) => setDiabeticConfirmed(event.target.checked)}/>Patient diabetes status confirmed when changing ocular to combined</label><button onClick={() => void savePackageCorrection()} className="rounded bg-slate-900 px-4 py-2 font-semibold text-white">Correct service package</button></> : <p className="text-sm text-slate-600">Package correction requires performing-clinic optometrist/reviewer authority and an unfinalized report.</p>}{packageMessage && <p className="text-sm">{packageMessage}</p>}</div>
       </EncounterSection>
       <EncounterSection
         sectionId="clinical-intake"
@@ -1068,7 +1077,7 @@ export default function EncounterDetailPage({ params }: Props) {
       {isComprehensiveOcular ? (
         <EncounterSection
           sectionId="ocular-assessment"
-          title="General Ocular Clinical Record"
+          title="Comprehensive Ocular Assessment Clinical Record"
           status={encounter.ocular_assessment ? "In progress" : "Not started"}
           open={openSections.has("ocular-assessment")}
           onToggle={() => toggleSection("ocular-assessment")}
@@ -1139,7 +1148,8 @@ export default function EncounterDetailPage({ params }: Props) {
 
       {includesEyeHealth ? <EncounterSection
         sectionId="eye-health-report"
-        title="Eye Health Screening Report"
+        title="Targeted Retinal and Glaucoma-Risk Screening Report"
+        status={displayValue(encounter.targeted_screening_report_status || "not_started")}
         open={openSections.has("eye-health-report")}
         onToggle={() => toggleSection("eye-health-report")}
       >

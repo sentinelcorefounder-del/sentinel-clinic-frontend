@@ -18,6 +18,10 @@ type HospitalReferral = {
   report_id_display?: string;
   report_pdf_url?: string;
   report_status?: string;
+  targeted_patient_report_url?: string;
+  targeted_clinician_report_url?: string;
+  combined_patient_bundle_url?: string;
+  combined_clinician_bundle_url?: string;
   hospital_commission_amount: string;
   payout_status: string;
   payment_status?: string;
@@ -238,15 +242,8 @@ export default function HospitalReferralsPage() {
                     </td>
 
                     <td className="p-4 text-sm text-slate-900">
-                      {referral.report_status === "issued" && referral.report_ready && pdfUrl ? (
-                        <a
-                          href={pdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold !text-white hover:bg-slate-800"
-                        >
-                          View Report
-                        </a>
+                      {referral.report_ready && (pdfUrl || referral.targeted_clinician_report_url) ? (
+                        <div className="flex flex-col gap-1">{pdfUrl ? <a href={pdfUrl} target="_blank" rel="noreferrer" className="inline-flex rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold !text-white hover:bg-slate-800">Diabetic Report</a> : null}{referral.targeted_clinician_report_url ? <a href={referral.targeted_clinician_report_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-700 underline">Clinician Targeted Report</a> : null}{referral.targeted_patient_report_url ? <a href={referral.targeted_patient_report_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-700 underline">Patient Targeted Report</a> : null}{referral.combined_clinician_bundle_url ? <a href={referral.combined_clinician_bundle_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-700 underline">Combined Clinician Bundle</a> : null}{referral.combined_patient_bundle_url ? <a href={referral.combined_patient_bundle_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-700 underline">Combined Patient Bundle</a> : null}</div>
                       ) : (
                         <span className="text-slate-500">
                           {referral.report_status === "submitted_to_ops"

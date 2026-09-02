@@ -45,6 +45,7 @@ export type Encounter = {
   programme: AssessmentProgramme;
   service_package: ServicePackage | null;
   service_package_locked?: boolean;
+  targeted_screening_report_status?: "not_started" | "draft" | "previewed" | "finalized";
   assessment_location_snapshot: {
     location_type?: string;
     site_name?: string;

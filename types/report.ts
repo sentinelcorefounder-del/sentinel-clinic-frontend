@@ -145,6 +145,9 @@ export type EyeHealthScreeningReport = {
   outcome: string;
   selected_advice: string[];
   advice: string;
+  structured_findings: TargetedScreeningFindings;
+  generated_suggestion: string;
+  clinical_summary: string;
   right_visual_field_result: string;
   left_visual_field_result: string;
   right_fundus_result: string;
@@ -154,6 +157,9 @@ export type EyeHealthScreeningReport = {
   status: "draft" | "finalized";
   previewed_at: string | null;
   lock_version: number;
+  clean_pdf_ready: boolean;
+  hospital_released_version?: number | null;
+  hospital_released_at?: string | null;
   professional_defaults: null | {
     display_name: string;
     professional_role: string;
@@ -165,4 +171,31 @@ export type EyeHealthScreeningReport = {
     checksum_sha256: string;
     attachment_manifest: Array<Record<string, unknown>>;
   } | null;
+};
+
+export type TargetedScreeningEyeFindings = {
+  visual_field_reliability: string;
+  visual_field_result: string;
+  ght: string;
+  cup_to_disc_ratio: string;
+  vfi: string;
+  other_machine_values: string;
+};
+
+export type TargetedScreeningFindings = {
+  fundus_quality: string;
+  optic_disc: string[];
+  optic_disc_other: string;
+  retinal_vessels: string[];
+  retinal_vessels_other: string;
+  retina_macula: string[];
+  retina_macula_other: string;
+  right: TargetedScreeningEyeFindings;
+  left: TargetedScreeningEyeFindings;
+  iop_interpretation: string;
+  iop_other: string;
+  visual_acuity_interpretation: string;
+  visual_acuity_other: string;
+  clinical_interpretation: string;
+  clinical_other: string;
 };

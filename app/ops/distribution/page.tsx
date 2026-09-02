@@ -58,7 +58,7 @@ export default function OpsDistributionPage() {
       setBusyId(item.id);
       setError("");
       setMessage("");
-      await releaseReportToHospital(item.id, item.lock_version);
+      await releaseReportToHospital(item.id, item.lock_version, item.kind);
       setMessage(`Report ${item.report_id} released to ${item.source_hospital_name}.`);
       await load();
     } catch (err) {
@@ -145,7 +145,7 @@ export default function OpsDistributionPage() {
                   <tr key={item.id} className="border-t align-top">
                     <td className="p-3">
                       <p className="font-semibold">{item.report_id}</p>
-                      <div className="mt-2"><ReportFormatMenu reportId={item.id} role="ops" /></div>
+                      <div className="mt-2">{item.kind === "targeted" ? <div className="flex flex-col gap-1 text-xs"><a className="text-blue-700 underline" href={item.pdf_url.replace("clinician", "patient")} target="_blank" rel="noreferrer">Preview Patient Report</a><a className="text-blue-700 underline" href={item.pdf_url} target="_blank" rel="noreferrer">Preview Clinician Report</a></div> : <ReportFormatMenu reportId={item.id} role="ops" />}</div>
                     </td>
                     <td className="p-3">
                       <p className="font-medium">{item.patient_name}</p>
@@ -179,7 +179,7 @@ export default function OpsDistributionPage() {
                             Release to Hospital
                           </button>
                         ) : null}
-                        {!item.patient_delivery_required ? (
+                        {item.kind === "diabetic" && !item.patient_delivery_required ? (
                           <button
                             type="button"
                             disabled={busyId === item.id}

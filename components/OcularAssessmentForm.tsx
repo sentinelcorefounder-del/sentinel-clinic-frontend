@@ -78,7 +78,7 @@ export default function OcularAssessmentForm({
 
   return (
     <section className="rounded-lg border p-6">
-      <h2 className="text-xl font-semibold">General Ocular Clinical Record</h2>
+      <h2 className="text-xl font-semibold">Comprehensive Ocular Assessment Clinical Record</h2>
       <p className="mt-1 text-sm text-gray-600">
         Clinic-owned findings for general ocular care. This record is separate
         from diabetic grading and the hospital report-release queue.
@@ -88,17 +88,17 @@ export default function OcularAssessmentForm({
       {message ? <p className="mt-4 rounded bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {[
+        {([
           ["visual_acuity_performed", "Visual acuity"],
           ["tonometry_performed", "Tonometry / IOP"],
           ["fundus_photography_performed", "Fundus photography"],
           ["visual_field_performed", "Visual fields"],
           ["anterior_eye_assessment_performed", "Anterior eye assessment"],
-        ].map(([field, label]) => (
+        ] as Array<[keyof typeof form, string]>).map(([field, label]) => (
           <label key={field} className="flex items-center gap-2 rounded border p-3 text-sm">
             <input
               type="checkbox"
-              checked={Boolean((form as any)[field])}
+              checked={Boolean(form[field])}
               onChange={(event) => setField(field, event.target.checked)}
             />
             {label}
@@ -107,7 +107,7 @@ export default function OcularAssessmentForm({
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        {[
+        {([
           ["presenting_complaint", "Presenting complaint"],
           ["ocular_history", "Ocular and relevant medical history"],
           ["anterior_eye_findings", "Anterior eye findings"],
@@ -116,12 +116,12 @@ export default function OcularAssessmentForm({
           ["tonometry_summary", "Tonometry interpretation"],
           ["impression", "Clinical impression / diagnosis"],
           ["management_plan", "Management and referral plan"],
-        ].map(([field, label]) => (
+        ] as Array<[keyof typeof form, string]>).map(([field, label]) => (
           <label key={field} className="space-y-1">
             <span className="text-sm font-medium">{label}</span>
             <textarea
               rows={3}
-              value={String((form as any)[field] || "")}
+              value={String(form[field] || "")}
               onChange={(event) => setField(field, event.target.value)}
               className="w-full rounded-lg border px-3 py-2"
             />
