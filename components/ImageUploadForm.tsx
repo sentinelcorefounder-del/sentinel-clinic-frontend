@@ -25,7 +25,6 @@ export default function ImageUploadForm({
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const [imageUploadId, setImageUploadId] = useState("");
   const [eyeLaterality, setEyeLaterality] = useState("left");
   const [imageType, setImageType] = useState("fundus");
   const [imageQuality, setImageQuality] = useState("good");
@@ -82,7 +81,6 @@ export default function ImageUploadForm({
 
     try {
       const formData = new FormData();
-      formData.append("image_upload_id", imageUploadId);
       formData.append("encounter", String(encounterId));
       formData.append("patient", String(patientId));
       formData.append("eye_laterality", eyeLaterality);
@@ -95,7 +93,6 @@ export default function ImageUploadForm({
       await createImageUpload(formData);
 
       setMessage("Upload successful. AI suggestion is now available below.");
-      setImageUploadId("");
       setFile(null);
 
       if (onUploadSuccess) {
@@ -149,13 +146,6 @@ export default function ImageUploadForm({
         <p><strong>Right eye:</strong> {hasRightImage ? "Uploaded" : "Not uploaded"}</p>
       </div>
 
-      <input
-        value={imageUploadId}
-        onChange={(e) => setImageUploadId(e.target.value)}
-        placeholder="Image Upload ID"
-        className="w-full rounded border p-3"
-        required
-      />
 
       <select
         value={eyeLaterality}

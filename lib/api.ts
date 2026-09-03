@@ -297,6 +297,18 @@ export async function correctEncounterServicePackage(id: string | number, data: 
   return responseData;
 }
 
+export async function correctEncounterAssessmentLocation(id: string | number, data: {
+  location_type: string; site_name: string; address?: string; reason: string;
+}) {
+  const res = await fetch(`${API_URL}/encounters/${id}/assessment-location/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true),
+    body: JSON.stringify(data),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to correct assessment location."));
+  return responseData;
+}
+
 export async function fetchEyeHealthReport(encounterId: string | number) {
   const res = await fetch(`${API_URL}/reports/eye-health/encounter/${encounterId}/`, {
     cache: "no-store", credentials: "include",
@@ -515,12 +527,12 @@ export async function createImageUpload(formData: FormData) {
     body: formData,
   });
 
+  const responseData = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to upload image: ${res.status} ${text}`);
+    throw new Error(formatApiError(responseData, "Failed to upload image."));
   }
 
-  return res.json();
+  return responseData;
 }
 
 export async function createMobileTransfer(encounterId: number) {

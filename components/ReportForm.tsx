@@ -55,7 +55,6 @@ const MACULOPATHY_OPTIONS = [
 
 function blankForm(encounterId: number, patientId: number, encounter?: Props["encounter"]) {
   return {
-    report_id: "",
     encounter: encounterId,
     patient: patientId,
     review_date: "",
@@ -122,7 +121,6 @@ export default function ReportForm({
     setReport(existingReport || null);
     if (existingReport) {
       setFormData({
-        report_id: existingReport.report_id || "",
         encounter: existingReport.encounter,
         patient: existingReport.patient,
         review_date: existingReport.review_date || "",
@@ -392,7 +390,6 @@ export default function ReportForm({
           </div>
         ) : null}
 
-        <input name="report_id" value={formData.report_id} onChange={handleChange} placeholder="Report ID" className="w-full rounded border p-3" required disabled={isExisting || !isEditable} />
         <input name="review_date" type="date" value={formData.review_date} onChange={handleChange} className="w-full rounded border p-3" required disabled={!isEditable} />
 
         {programme !== "ocular_diagnostics" ? (

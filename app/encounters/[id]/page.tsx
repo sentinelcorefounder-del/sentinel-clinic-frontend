@@ -14,6 +14,7 @@ import {
   deleteImageUpload,
   fetchOcularInvestigations,
   correctEncounterServicePackage,
+  correctEncounterAssessmentLocation,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter, OcularInvestigation } from "@/types/encounter";
@@ -157,12 +158,19 @@ export default function EncounterDetailPage({ params }: Props) {
   const [packageChoice, setPackageChoice] = useState("");
   const [diabeticConfirmed, setDiabeticConfirmed] = useState(false);
   const [packageMessage, setPackageMessage] = useState("");
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationType, setLocationType] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [locationReason, setLocationReason] = useState("");
+  const [locationMessage, setLocationMessage] = useState("");
 
   const [savingMeasurements, setSavingMeasurements] = useState(false);
   const [measurementMessage, setMeasurementMessage] = useState("");
   const [measurementMessageType, setMeasurementMessageType] =
     useState<"success" | "error" | "info">("info");
   const [savingClinicalIntake, setSavingClinicalIntake] = useState(false);
+  const [editingClinicalIntake, setEditingClinicalIntake] = useState(false);
   const [clinicalIntakeMessage, setClinicalIntakeMessage] = useState("");
   const [clinicalIntakeMessageType, setClinicalIntakeMessageType] =
     useState<"success" | "error">("success");
@@ -387,6 +395,7 @@ export default function EncounterDetailPage({ params }: Props) {
       });
       setClinicalIntakeMessageType("success");
       setClinicalIntakeMessage("Clinical intake saved successfully.");
+      setEditingClinicalIntake(false);
     } catch (err) {
       setClinicalIntakeMessageType("error");
       setClinicalIntakeMessage(
@@ -445,7 +454,6 @@ export default function EncounterDetailPage({ params }: Props) {
   const canDeleteUploads = hasAnyRole(currentUser, ALLOWED_DELETE_UPLOAD_ROLES);
   const canEditClinicalIntake = Boolean(
     currentUser &&
-      !currentUser.is_superuser &&
       currentUser.organization?.organization_type === "clinic" &&
       currentUser.roles?.some((role) => role === "optometrist" || role === "reviewer")
   );
@@ -459,6 +467,34 @@ export default function EncounterDetailPage({ params }: Props) {
   const isComprehensiveOcular = encounter?.service_package
     ? encounter.service_package === "comprehensive_ocular_assessment"
     : encounter?.programme === "ocular_diagnostics";
+
+  function beginLocationCorrection() {
+    const location = encounter?.assessment_location_snapshot || {};
+    setLocationType(location.location_type || "clinic");
+    setLocationName(location.site_name || "");
+    setLocationAddress(location.address || "");
+    setLocationReason("");
+    setLocationMessage("");
+    setEditingLocation(true);
+  }
+
+  async function saveLocationCorrection() {
+    if (!encounter || !locationName.trim() || !locationReason.trim()) {
+      setLocationMessage("Enter the corrected location and a correction reason.");
+      return;
+    }
+    try {
+      const updated = await correctEncounterAssessmentLocation(encounter.id, {
+        location_type: locationType, site_name: locationName.trim(),
+        address: locationAddress.trim(), reason: locationReason.trim(),
+      });
+      setEncounter(updated);
+      setEditingLocation(false);
+      setLocationMessage("Assessment location corrected and audited.");
+    } catch (value) {
+      setLocationMessage(value instanceof Error ? value.message : "Location correction failed.");
+    }
+  }
 
   async function savePackageCorrection() {
     if (!encounter || !packageChoice || !packageReason.trim()) return setPackageMessage("Choose a package and enter a correction reason.");
@@ -532,7 +568,7 @@ export default function EncounterDetailPage({ params }: Props) {
             <strong>Programme:</strong> {displayValue(encounter.programme)}
           </p>
           <p><strong>Service package:</strong> {displayValue(encounter.service_package || "Historical — confirmation required")}</p>
-          <p><strong>Assessment location:</strong> {[encounter.assessment_location_snapshot?.site_name, encounter.assessment_location_snapshot?.address].filter(Boolean).join(" · ") || "Not recorded"}</p>
+          <div className="sm:col-span-2 lg:col-span-3"><p><strong>Assessment location:</strong> {[encounter.assessment_location_snapshot?.site_name, encounter.assessment_location_snapshot?.address].filter(Boolean).join(" · ") || "Not recorded"}</p>{canEditClinicalIntake ? <div className="mt-2 space-y-2">{!editingLocation ? <button type="button" onClick={beginLocationCorrection} className="rounded border px-3 py-1.5 text-xs font-semibold">Correct assessment location</button> : <div className="grid gap-2 rounded border p-3 sm:grid-cols-2"><select value={locationType} onChange={(e)=>setLocationType(e.target.value)} className="rounded border p-2"><option value="clinic">Clinic</option><option value="hospital">Hospital</option><option value="mobile">Mobile</option><option value="community">Community</option><option value="other">Other</option></select><input value={locationName} onChange={(e)=>setLocationName(e.target.value)} placeholder="Site/location name" className="rounded border p-2"/><input value={locationAddress} onChange={(e)=>setLocationAddress(e.target.value)} placeholder="Address (optional)" className="rounded border p-2 sm:col-span-2"/><textarea value={locationReason} onChange={(e)=>setLocationReason(e.target.value)} placeholder="Required correction reason" className="rounded border p-2 sm:col-span-2"/><div className="flex gap-2 sm:col-span-2"><button type="button" onClick={()=>void saveLocationCorrection()} className="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Save correction</button><button type="button" onClick={()=>setEditingLocation(false)} className="rounded border px-3 py-2 text-xs font-semibold">Cancel</button></div></div>}{locationMessage ? <p className="text-xs text-slate-700">{locationMessage}</p> : null}</div> : null}</div>
           <p>
             <strong>Consent Status:</strong> {patient.consent_status || "-"}
           </p>
@@ -591,7 +627,9 @@ export default function EncounterDetailPage({ params }: Props) {
             </div>
           ) : null}
 
-          {canEditClinicalIntake ? (
+          {canEditClinicalIntake && !editingClinicalIntake ? <button type="button" onClick={() => setEditingClinicalIntake(true)} className="rounded border px-3 py-2 text-sm font-semibold">Edit clinical intake</button> : null}
+
+          {canEditClinicalIntake && editingClinicalIntake ? (
             <div className="grid gap-4">
               {includesDiabetic || clinicalIntakeForm.diabetes_duration ? (
                 <label className="space-y-1">
@@ -998,7 +1036,7 @@ export default function EncounterDetailPage({ params }: Props) {
                             <p>{ai.draft_note}</p>
                           </div>
                         ) : null}
-                        
+
                         <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-900">
                           {ai.disclaimer ||
                             "AI output is for clinician review only and must not be treated as a final diagnosis."}
