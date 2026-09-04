@@ -6,10 +6,11 @@ import type { AssessmentServiceSession, ServicePartner } from "@/types/finance";
 
 type OrganizationOption = { id: number; name: string; organization_type: string; branches: Array<{ id: number; name: string }> };
 
-export default function InternalFinanceFoundationManager({ sessions, partners, organizations }: {
+export default function InternalFinanceFoundationManager({ sessions, partners, organizations, canAdminPartners }: {
   sessions: AssessmentServiceSession[];
   partners: ServicePartner[];
   organizations: OrganizationOption[];
+  canAdminPartners: boolean;
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,7 +35,7 @@ export default function InternalFinanceFoundationManager({ sessions, partners, o
     {error ? <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
 
     <section className="grid gap-5 lg:grid-cols-2">
-      <form className="space-y-3 rounded-2xl border bg-white p-5" onSubmit={(event) => {
+      {canAdminPartners ? <form className="space-y-3 rounded-2xl border bg-white p-5" onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         void submit("/api/finance/internal/service-partners/", "POST", {
@@ -47,7 +48,7 @@ export default function InternalFinanceFoundationManager({ sessions, partners, o
         <input required name="name" placeholder="Legal/display name" className="w-full rounded border p-2" />
         <input name="contact_email" type="email" placeholder="Finance contact email (optional)" className="w-full rounded border p-2" />
         <button disabled={busy} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white">Create non-login partner</button>
-      </form>
+      </form> : <div className="rounded-2xl border bg-slate-50 p-5 text-sm text-slate-600">Service-partner creation remains restricted to internal finance administrators.</div>}
 
       <form className="space-y-3 rounded-2xl border bg-white p-5" onSubmit={(event) => {
         event.preventDefault();
@@ -83,7 +84,7 @@ export default function InternalFinanceFoundationManager({ sessions, partners, o
       <h2 className="mb-3 text-lg font-bold">Configured service partners</h2>
       <div className="space-y-2">{partners.length ? partners.map((partner) => <div key={partner.id} className="flex flex-wrap items-center justify-between gap-3 rounded border p-3">
         <div><p className="font-semibold">{partner.name}</p><p className="font-mono text-xs text-slate-600">{partner.clinic_id} · {partner.is_active ? "Active" : "Inactive"}</p></div>
-        {partner.is_active ? <button disabled={busy} onClick={() => void submit(`/api/finance/internal/service-partners/${partner.id}/`, "PATCH", { is_active: false })} className="rounded bg-slate-700 px-3 py-1 text-sm text-white">Deactivate</button> : null}
+        {partner.is_active && canAdminPartners ? <button disabled={busy} onClick={() => void submit(`/api/finance/internal/service-partners/${partner.id}/`, "PATCH", { is_active: false })} className="rounded bg-slate-700 px-3 py-1 text-sm text-white">Deactivate</button> : null}
       </div>) : <p className="text-sm text-slate-500">No service partners configured.</p>}</div>
     </section>
 

@@ -8,5 +8,5 @@ export default async function InternalFinanceLayout({ children }: { children: Re
   const allowed = user?.is_internal_sentinel_staff === true &&
     ["finance_admin", "finance_operator", "finance_approver"].some(role => roles.includes(role));
   if (!allowed) redirect("/ops/finance");
-  return <div className="space-y-6"><nav className="flex flex-wrap gap-2 text-sm font-semibold"><Link href="/ops/finance/internal/payables" className="rounded-xl border bg-white px-4 py-2">Partner payables</Link>{roles.includes("finance_admin") && <Link href="/ops/finance/internal/sessions" className="rounded-xl border bg-white px-4 py-2">Partners & sessions</Link>}</nav>{children}</div>;
+  return <div className="space-y-6"><nav className="flex flex-wrap gap-2 text-sm font-semibold"><Link href="/ops/finance/internal/payables" className="rounded-xl border bg-white px-4 py-2">Partner payables</Link>{(roles.includes("finance_admin") || roles.includes("finance_operator")) && <Link href="/ops/finance/internal/sessions" className="rounded-xl border bg-white px-4 py-2">Partners & sessions</Link>}</nav>{children}</div>;
 }

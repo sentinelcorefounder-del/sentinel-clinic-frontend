@@ -9,6 +9,7 @@ export type FinanceWallet = {
   available_balance: string;
   reserved_balance: string;
   spendable_balance: string;
+  transferable_balance: string;
   notes: string;
 };
 
@@ -120,11 +121,11 @@ export type EncounterSponsorship = {
 
 export type TreasuryTransfer = {
   id: number; transfer_reference: string; wallet: number; wallet_name: string; amount: string;
-  currency: string; purpose: string; destination_label: string; external_reference: string;
+  currency: string; category: string; purpose: string; destination_label: string; external_reference: string;
   status: string; available_surplus_snapshot: Record<string, string>; created_by_name: string;
   decided_by_name: string | null; executed_by_name: string | null; decided_at: string | null;
-  executed_at: string | null; decision_reason: string; cancellation_reason: string;
-  evidence_available: boolean; created_at: string;
+  executed_at: string | null; execution_date: string | null; decision_reason: string; cancellation_reason: string;
+  founder_expense: number | null; evidence_available: boolean; created_at: string;
 };
 
 export type PartnerFinance = {
@@ -313,4 +314,13 @@ export type BillingProfile = {
   receipt_prefix: string;
   is_active: boolean;
   is_complete: boolean;
+};
+
+export type FounderFundedExpense = {
+  id: number; expense_reference: string; expense_date: string; category: string;
+  supplier_payee: string; description: string; amount: string; currency: string;
+  funding_treatment: "founder_contribution" | "founder_reimbursable"; status: string;
+  created_by_name: string; submitted_at: string | null; decided_by_name: string | null;
+  decided_at: string | null; decision_reason: string; settled_at: string | null;
+  reimbursement_transfer_id: number | null; evidence_available: boolean; created_at: string;
 };

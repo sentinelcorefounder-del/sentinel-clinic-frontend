@@ -11,20 +11,21 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
 }) {
   const [walletId, setWalletId] = useState(String(wallets[0]?.id || ""));
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("other_operating_expense");
   const [purpose, setPurpose] = useState("");
   const [destination, setDestination] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function create() {
-    if (!walletId || !amount || !purpose.trim() || !destination.trim()) {
-      setError("Wallet, amount, purpose and destination label are required.");
+    if (!walletId || !amount || !category || !purpose.trim() || !destination.trim()) {
+      setError("Sentinel wallet, amount, category, purpose and destination label are required.");
       return;
     }
     setBusy(true); setError("");
     try {
       await financeWrite("/api/finance/treasury-transfers/", "POST", {
-        wallet: Number(walletId), amount, purpose: purpose.trim(),
+        wallet: Number(walletId), amount, category, purpose: purpose.trim(),
         destination_label: destination.trim(), idempotency_key: crypto.randomUUID(),
       });
       location.reload();
@@ -38,6 +39,8 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
   }
 
   async function execute(item: TreasuryTransfer) {
+    const executionDate = prompt("Execution date (YYYY-MM-DD)", new Date().toISOString().slice(0, 10));
+    if (!executionDate) return;
     const reference = prompt("External bank/payment reference");
     if (!reference) return;
     const input = document.createElement("input");
@@ -46,7 +49,7 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
       const evidence = input.files?.[0];
       if (!evidence) return;
       setBusy(true); setError("");
-      const form = new FormData(); form.append("external_reference", reference); form.append("evidence", evidence);
+      const form = new FormData(); form.append("execution_date", executionDate); form.append("external_reference", reference); form.append("evidence", evidence);
       try { await financeWriteForm(`/api/finance/treasury-transfers/${item.id}/execute/`, form); location.reload(); }
       catch (value) { setError(value instanceof Error ? value.message : "Unable to record execution."); setBusy(false); }
     };
@@ -58,13 +61,15 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
       <h2 className="text-lg font-bold">New transfer draft</h2>
       <p className="mt-1 text-sm text-slate-600">This register records an independently executed transfer. Approval never initiates banking.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <label className="text-sm font-medium">Sentinel wallet<select value={walletId} onChange={event => setWalletId(event.target.value)} className="mt-1 w-full rounded-lg border p-2">{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.organization_name} · available {money(wallet.available_balance)}</option>)}</select></label>
+        <label className="text-sm font-medium">Sentinel wallet<select value={walletId} onChange={event => setWalletId(event.target.value)} className="mt-1 w-full rounded-lg border p-2" disabled={!wallets.length}><option value="">{wallets.length ? "Select Sentinel wallet" : "No eligible Sentinel treasury wallet"}</option>{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.organization_name} · {wallet.currency} · available {money(wallet.available_balance)} · reserved {money(wallet.reserved_balance)} · transferable {money(wallet.transferable_balance)}</option>)}</select></label>
+        <label className="text-sm font-medium">Category<select value={category} onChange={event => setCategory(event.target.value)} className="mt-1 w-full rounded-lg border p-2"><option value="salary_payroll">Salary / payroll</option><option value="contractor">Contractor</option><option value="hosting_software">Hosting / software</option><option value="field_operations">Field operations</option><option value="marketing_administration">Marketing / administration</option><option value="equipment_supplies">Equipment / supplies</option><option value="tax_professional_fees">Tax / professional fees</option><option value="founder_reimbursement">Founder reimbursement</option><option value="internal_account_transfer">Internal account transfer</option><option value="other_operating_expense">Other approved operating expense</option></select></label>
         <label className="text-sm font-medium">Amount<input value={amount} onChange={event => setAmount(event.target.value)} type="number" min="0.01" step="0.01" className="mt-1 w-full rounded-lg border p-2" /></label>
         <label className="text-sm font-medium">Purpose<textarea value={purpose} onChange={event => setPurpose(event.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
         <label className="text-sm font-medium">Destination label<input value={destination} onChange={event => setDestination(event.target.value)} className="mt-1 w-full rounded-lg border p-2" placeholder="Reviewed destination name only" /></label>
       </div>
       <button disabled={busy} onClick={create} className="mt-4 rounded-xl bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">Create draft</button>
     </section>}
+    {!wallets.length && capabilities.can_operate && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No eligible Sentinel treasury wallet was returned. No wallet or balance will be created automatically; verify the existing funded Sentinel wallet designation.</p>}
     {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     <section className="space-y-3">{items.map(item => <article key={item.id} className="rounded-2xl border bg-white p-5 shadow-sm">
       <div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-bold">{item.transfer_reference} · {money(item.amount)}</h3><p className="text-sm text-slate-600">{item.wallet_name} → {item.destination_label}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase">{item.status}</span></div>
