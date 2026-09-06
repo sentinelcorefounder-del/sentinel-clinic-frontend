@@ -30,7 +30,9 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const currentPrice = useMemo(() => finance?.active_pricing_rules?.[0] || null, [finance]);
+  const basePrices = useMemo(() => (finance?.active_pricing_rules || []).filter((rule) => rule.service_type !== "ocular_ai_review"), [finance]);
+  const aiPrice = useMemo(() => (finance?.active_pricing_rules || []).find((rule) => rule.service_type === "ocular_ai_review") || null, [finance]);
+  const currentPrice = basePrices[0] || null;
   const lowBalance = Boolean(finance?.wallet && currentPrice && Number(finance.wallet.spendable_balance) < Number(currentPrice.gross_amount) * 5);
 
   function exportStatement() {
@@ -99,7 +101,7 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
     <main className="min-h-screen space-y-8 bg-slate-100 p-6 md:p-10">
       <div>
         <h1 className="text-3xl font-bold text-slate-950">{title}</h1>
-        <p className="mt-1 text-slate-700">Wallet, agreed pricing and assessment charges for {finance.organization_name}.</p>
+        <p className="mt-1 text-slate-700">Clinic/hospital funds, agreed service pricing and assessment activity for {finance.organization_name}. Treasury funds are separate.</p>
       </div>
 
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -109,20 +111,17 @@ export default function FinancePartnerPortal({ title }: { title: string }) {
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">Available balance</p><p className="mt-2 text-3xl font-bold">{money(finance.wallet?.available_balance, finance.wallet?.currency)}</p></div>
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">Reserved balance</p><p className="mt-2 text-3xl font-bold">{money(finance.wallet?.reserved_balance, finance.wallet?.currency)}</p></div>
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">Spendable balance</p><p className="mt-2 text-3xl font-bold">{money(finance.wallet?.spendable_balance, finance.wallet?.currency)}</p></div>
-        <div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">Agreed assessment charge</p><p className="mt-2 text-3xl font-bold">{currentPrice ? money(currentPrice.gross_amount, finance.active_contract?.currency) : "Not configured"}</p></div>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-600">Base assessment price</p><p className="mt-2 text-3xl font-bold">{currentPrice ? money(currentPrice.gross_amount, finance.active_contract?.currency) : "Not configured"}</p>{aiPrice ? <p className="mt-2 text-xs text-slate-500">AI clinical review is separate: {money(aiPrice.gross_amount, finance.active_contract?.currency)}</p> : null}</div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold">Current agreement</h2>
-          {finance.active_contract ? (
-            <dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
-              <div><dt className="text-slate-500">Contract</dt><dd className="font-semibold">{finance.active_contract.name}</dd></div>
-              <div><dt className="text-slate-500">Status</dt><dd className="font-semibold">{label(finance.active_contract.status)}</dd></div>
-              <div><dt className="text-slate-500">Effective from</dt><dd className="font-semibold">{finance.active_contract.effective_from}</dd></div>
-              <div><dt className="text-slate-500">Payment model</dt><dd className="font-semibold">{finance.active_contract.credit_allowed ? `${finance.active_contract.payment_terms_days}-day credit` : "Prefunded wallet"}</dd></div>
-              <div className="col-span-2"><dt className="text-slate-500">Pricing rules</dt><dd className="mt-2 space-y-2">{finance.active_pricing_rules.map((rule) => <div key={rule.id} className="flex justify-between rounded-lg bg-slate-50 p-3"><span>{rule.name}</span><strong>{money(rule.gross_amount, finance.active_contract?.currency)}</strong></div>)}</dd></div>
-            </dl>
+          <h2 className="text-xl font-bold">Current service agreements</h2>
+          {finance.active_contracts.length ? (
+            <div className="mt-5 space-y-4 text-sm">
+              <div className="flex flex-wrap gap-2">{finance.active_contracts.map((contract) => <span key={contract.id} className="rounded-full bg-slate-100 px-3 py-1 font-medium">{label(contract.programme)} · from {contract.effective_from}</span>)}</div>
+              <div><p className="text-slate-500">Service prices</p><div className="mt-2 space-y-2">{finance.active_pricing_rules.map((rule) => <div key={rule.id} className="flex justify-between rounded-lg bg-slate-50 p-3"><span>{label(rule.service_type)}{rule.service_type === "ocular_ai_review" ? " (add-on)" : ""}</span><strong>{money(rule.gross_amount, finance.active_contract?.currency)}</strong></div>)}</div></div>
+            </div>
           ) : <p className="mt-4 text-slate-600">No active finance contract has been configured.</p>}
         </div>
 

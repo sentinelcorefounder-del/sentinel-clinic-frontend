@@ -134,6 +134,7 @@ export type PartnerFinance = {
   organization_type: "clinic" | "hospital" | "sentinel";
   wallet: FinanceWallet | null;
   active_contract: PartnerContract | null;
+  active_contracts: PartnerContract[];
   active_pricing_rules: PricingRule[];
   recent_ledger: LedgerEntry[];
   recent_financial_records: FinancialRecord[];

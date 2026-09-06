@@ -31,6 +31,7 @@ export default function ContractManager({
     programme: "diabetic_screening",
     gross_amount: "15000",
     ai_review_amount: "4000",
+    include_ai_review: false,
     effective_from: today,
     payment_responsibility: "hospital",
     equipment_owner_type: "sentinel",
@@ -51,8 +52,10 @@ export default function ContractManager({
         form.programme === "ocular_diagnostics"
           ? "ocular_assessment"
           : form.programme === "combined_assessment"
-            ? "combined_assessment"
-            : "retinal_assessment";
+            ? "combined_diabetic_eye_health"
+            : form.programme === "eye_health_screening"
+              ? "eye_health_screening"
+              : "diabetic_retinal_assessment";
       const contract = await financeWrite("/api/finance/contracts/", "POST", {
         organization: Number(form.organization),
         name: form.name,
@@ -143,7 +146,8 @@ export default function ContractManager({
             <select value={form.programme} onChange={(event) => setForm({ ...form, programme: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2">
               <option value="diabetic_screening">Diabetic screening</option>
               <option value="ocular_diagnostics">Ocular diagnostics</option>
-              <option value="combined_assessment">Combined assessment</option>
+              <option value="combined_assessment">Combined diabetic eye health assessment</option>
+              <option value="eye_health_screening">Eye health assessment</option>
             </select>
           </label>
           <label className="text-sm font-medium">
@@ -154,11 +158,11 @@ export default function ContractManager({
             Assessment charge (NGN)
             <input required type="number" min="0" step="0.01" value={form.gross_amount} onChange={(event) => setForm({ ...form, gross_amount: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" />
           </label>
-          {isClinic && form.programme !== "diabetic_screening" ? (
-            <label className="text-sm font-medium">
-              AI clinical-review charge (NGN)
-              <input required type="number" min="0" step="0.01" value={form.ai_review_amount} onChange={(event) => setForm({ ...form, ai_review_amount: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" />
-            </label>
+          {isClinic ? (
+            <div className="space-y-2 rounded-xl border p-3">
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={form.include_ai_review} onChange={(event) => setForm({ ...form, include_ai_review: event.target.checked })} />Add separate AI clinical-review price</label>
+              {form.include_ai_review ? <label className="block text-sm font-medium">AI clinical-review add-on (NGN)<input required type="number" min="0" step="0.01" value={form.ai_review_amount} onChange={(event) => setForm({ ...form, ai_review_amount: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" /></label> : null}
+            </div>
           ) : null}
           <label className="text-sm font-medium">
             Effective from
