@@ -53,7 +53,7 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
       try { await financeWriteForm(`/api/finance/treasury-transfers/${item.id}/execute/`, form); location.reload(); }
       catch (value) { setError(value instanceof Error ? value.message : "Unable to record execution."); setBusy(false); }
     };
-    input.click();
+    document.body.appendChild(input); input.click();
   }
 
   return <div className="space-y-6">
