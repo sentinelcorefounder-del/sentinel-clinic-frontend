@@ -34,9 +34,9 @@ export default function HospitalReportsPage() {
   return (
     <main className="sentinel-page min-h-screen">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Issued Reports</h1>
+        <h1 className="text-2xl font-bold">Reports</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Reports approved, released and made available to your hospital by Sentinel Ops.
+          Sentinel-issued reports and historical uploaded reports made available through your hospital referrals.
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export default function HospitalReportsPage() {
             <tbody>
               {!reports.length ? <tr><td colSpan={6} className="p-5 text-slate-500">No issued reports found.</td></tr> :
                 reports.map((report) => (
-                  <tr key={report.id} className="border-t align-top">
+                  <tr key={`${report.report_type || "structured"}-${report.id}`} className="border-t align-top">
                     <td className="p-3 font-semibold">{report.report_id}</td>
                     <td className="p-3">
                       <div className="font-medium">{report.patient_name}</div>
@@ -73,10 +73,14 @@ export default function HospitalReportsPage() {
                     <td className="p-3">{formatDate(report.issued_at)}</td>
                     <td className="p-3">
                       <div className="flex min-w-[210px] flex-col gap-2">
-                        <ReportFormatMenu reportId={report.id} role="hospital" />
-                        <Link href={`/Hospital/reports/${report.id}`} className="rounded border px-3 py-2 text-center text-xs font-semibold text-slate-800">
-                          Open report details
-                        </Link>
+                        {report.report_type === "historical" ? <>
+                          <span className="rounded bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">Historical uploaded report</span>
+                          <a href={report.document_url} target="_blank" rel="noreferrer" className="rounded border px-3 py-2 text-center text-xs font-semibold text-slate-800">Open original PDF</a>
+                          <Link href={`/hospital/reports/historical-${report.id}`} className="rounded border px-3 py-2 text-center text-xs font-semibold text-slate-800">Open report details</Link>
+                        </> : <>
+                          <ReportFormatMenu reportId={report.id} role="hospital" />
+                          <Link href={`/hospital/reports/${report.id}`} className="rounded border px-3 py-2 text-center text-xs font-semibold text-slate-800">Open report details</Link>
+                        </>}
                       </div>
                     </td>
                   </tr>

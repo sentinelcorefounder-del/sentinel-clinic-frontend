@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 
 import Link from "next/link";
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ReactNode, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchEncounterById,
   updateEncounter,
@@ -15,6 +15,9 @@ import {
   fetchOcularInvestigations,
   correctEncounterServicePackage,
   correctEncounterAssessmentLocation,
+  fetchEncounterHistoricalReports,
+  uploadEncounterHistoricalReport,
+  type HistoricalReportDocument,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter, OcularInvestigation } from "@/types/encounter";
@@ -125,6 +128,7 @@ export default function EncounterDetailPage({ params }: Props) {
   const [patient, setPatient] = useState<any>(null);
   const [uploads, setUploads] = useState<ImageUpload[]>([]);
   const [reports, setReports] = useState<StructuredReport[]>([]);
+  const [historicalReports, setHistoricalReports] = useState<HistoricalReportDocument[]>([]);
   const [ocularInvestigations, setOcularInvestigations] = useState<OcularInvestigation[]>([]);
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -211,9 +215,10 @@ export default function EncounterDetailPage({ params }: Props) {
 
     const patientData = await fetchPatientById(String(encounterData.patient));
 
-    const [uploadData, reportData, consentData, investigationData] = await Promise.all([
+    const [uploadData, reportData, historicalReportData, consentData, investigationData] = await Promise.all([
       fetchEncounterUploads(encounterId),
       fetchEncounterReports(encounterId),
+      fetchEncounterHistoricalReports(encounterId),
       fetchEncounterConsents(encounterId),
       fetchOcularInvestigations(encounterId).catch(() => []),
     ]);
@@ -243,6 +248,7 @@ export default function EncounterDetailPage({ params }: Props) {
     setPatient(patientData);
     setUploads(uploadData);
     setReports(reportData);
+    setHistoricalReports(historicalReportData);
     setConsents(consentData);
     setOcularInvestigations(investigationData);
   }
@@ -1313,6 +1319,21 @@ export default function EncounterDetailPage({ params }: Props) {
       </div>
       </EncounterSection> : null}
 
+
+      <EncounterSection
+        sectionId="historical-reports"
+        title="Historical Reports"
+        status={historicalReports.length ? `${historicalReports.length} uploaded` : "None uploaded"}
+        open={openSections.has("historical-reports")}
+        onToggle={() => toggleSection("historical-reports")}
+      >
+        <HistoricalReportManager
+          encounter={encounter}
+          reports={historicalReports}
+          onUploaded={(item) => setHistoricalReports((current) => [item, ...current])}
+        />
+      </EncounterSection>
+
       <EncounterSection
         sectionId="onward-referral"
         title="Onward ophthalmology referral"
@@ -1329,4 +1350,78 @@ export default function EncounterDetailPage({ params }: Props) {
       </div>
     </main>
   );
+}
+
+
+function HistoricalReportManager({ encounter, reports, onUploaded }: {
+  encounter: Encounter;
+  reports: HistoricalReportDocument[];
+  onUploaded: (item: HistoricalReportDocument) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [reportDate, setReportDate] = useState(encounter.encounter_date || "");
+  const [title, setTitle] = useState("Historical uploaded report");
+  const [sourceOrganisation, setSourceOrganisation] = useState("");
+  const [sourceNote, setSourceNote] = useState("");
+  const [hospitalVisible, setHospitalVisible] = useState(Boolean(encounter.hospital_referral));
+  const [createFinance, setCreateFinance] = useState(false);
+  const [paymentState, setPaymentState] = useState("historical_unknown");
+  const [amount, setAmount] = useState("0.00");
+  const [amountPaid, setAmountPaid] = useState("0.00");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file) { setMessage("Choose the historical PDF first."); return; }
+    const body = new FormData();
+    body.append("document", file); body.append("report_date", reportDate); body.append("title", title);
+    body.append("source_organization_name", sourceOrganisation); body.append("source_note", sourceNote);
+    body.append("hospital_visible", hospitalVisible ? "true" : "false");
+    body.append("create_finance_record", createFinance ? "true" : "false");
+    if (createFinance) {
+      body.append("payment_state", paymentState); body.append("amount", amount); body.append("amount_paid", amountPaid);
+      body.append("payment_method", paymentMethod); body.append("payment_reference", paymentReference);
+    }
+    try {
+      setSaving(true); setMessage("");
+      const item = await uploadEncounterHistoricalReport(encounter.id, body);
+      onUploaded(item); setFile(null); setSourceNote("");
+      setMessage("Historical report uploaded and linked to this encounter.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); }
+    finally { setSaving(false); }
+  }
+
+  return <div className="space-y-5">
+    <div>
+      <h2 className="text-xl font-semibold">Historical Reports</h2>
+      <p className="mt-1 text-sm text-slate-600">Upload an existing PDF produced before or outside Sentinel. It remains clearly marked as historical and is not treated as a Sentinel-issued clinical report.</p>
+    </div>
+    <form onSubmit={submit} className="grid gap-3 rounded-lg border bg-slate-50 p-4 md:grid-cols-2">
+      <label className="space-y-1"><span className="text-sm font-medium">Historical report PDF</span><input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full rounded border bg-white p-2" /></label>
+      <label className="space-y-1"><span className="text-sm font-medium">Report / assessment date</span><input type="date" required value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="w-full rounded border p-2" /></label>
+      <label className="space-y-1"><span className="text-sm font-medium">Report title</span><input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded border p-2" /></label>
+      <label className="space-y-1"><span className="text-sm font-medium">Original source organisation</span><input value={sourceOrganisation} onChange={(e) => setSourceOrganisation(e.target.value)} placeholder="Clinic / hospital / provider" className="w-full rounded border p-2" /></label>
+      <label className="space-y-1 md:col-span-2"><span className="text-sm font-medium">Source / provenance note</span><textarea value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} rows={2} className="w-full rounded border p-2" /></label>
+      {encounter.hospital_referral ? <label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={hospitalVisible} onChange={(e) => setHospitalVisible(e.target.checked)} />Make this historical report visible to the referring hospital for this referral</label> : null}
+      <label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={createFinance} onChange={(e) => setCreateFinance(e.target.checked)} />Also record the historical assessment finance details</label>
+      {createFinance ? <>
+        <label className="space-y-1"><span className="text-sm font-medium">Payment status</span><select value={paymentState} onChange={(e) => setPaymentState(e.target.value)} className="w-full rounded border p-2"><option value="historical_unknown">Unknown</option><option value="historical_paid">Already paid historically</option><option value="historical_unpaid">Still unpaid</option></select></label>
+        <label className="space-y-1"><span className="text-sm font-medium">Historical charge</span><input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full rounded border p-2" /></label>
+        <label className="space-y-1"><span className="text-sm font-medium">Amount actually paid</span><input type="number" step="0.01" min="0" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} className="w-full rounded border p-2" /></label>
+        <label className="space-y-1"><span className="text-sm font-medium">Payment method</span><input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded border p-2" /></label>
+        <label className="space-y-1 md:col-span-2"><span className="text-sm font-medium">Payment reference</span><input value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} className="w-full rounded border p-2" /></label>
+      </> : null}
+      <div className="md:col-span-2"><button type="submit" disabled={saving} className="rounded bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{saving ? "Uploading..." : "Upload historical report"}</button></div>
+      {message ? <p className="text-sm md:col-span-2">{message}</p> : null}
+    </form>
+    {!reports.length ? <p className="text-sm text-slate-500">No historical reports uploaded for this encounter.</p> : <div className="space-y-3">{reports.map((item) => <div key={item.id} className="rounded-lg border p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{item.title}</p><p className="font-mono text-xs text-slate-500">{item.historical_report_id}</p></div><a href={item.document_url} target="_blank" rel="noreferrer" className="rounded border px-3 py-2 font-semibold">Open PDF</a></div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2"><p><strong>Report date:</strong> {item.report_date}</p><p><strong>Original source:</strong> {item.source_organization_name || "Not recorded"}</p><p><strong>Referral:</strong> {item.referral_id || "Clinic direct"}</p><p><strong>Hospital visibility:</strong> {item.hospital_visible ? `Visible to ${item.referring_hospital_name || "referring hospital"}` : "Not shared with hospital"}</p></div>
+      {item.source_note ? <p className="mt-2"><strong>Provenance note:</strong> {item.source_note}</p> : null}
+      {item.historical_finance ? <p className="mt-2 text-slate-600"><strong>Historical finance:</strong> {item.historical_finance.payment_state.replaceAll("_", " ")} · {item.historical_finance.currency} {item.historical_finance.amount}</p> : null}
+    </div>)}</div>}
+  </div>;
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { fetchHospitalReportById } from "@/lib/api";
+import { fetchHospitalHistoricalReportById, fetchHospitalReportById } from "@/lib/api";
 import ReportFormatMenu from "@/components/ReportFormatMenu";
 
 export default function HospitalReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -10,11 +10,28 @@ export default function HospitalReportDetailPage({ params }: { params: Promise<{
   const [error, setError] = useState("");
 
   useEffect(() => {
-    params.then(({ id }) => fetchHospitalReportById(id).then(setReport).catch((e) => setError(e.message)));
+    params.then(({ id }) => {
+      const historical = id.startsWith("historical-");
+      const reportId = historical ? id.replace("historical-", "") : id;
+      const loader = historical ? fetchHospitalHistoricalReportById : fetchHospitalReportById;
+      loader(reportId).then(setReport).catch((e) => setError(e.message));
+    });
   }, [params]);
 
   if (error) return <main className="p-10 text-red-700">{error}</main>;
   if (!report) return <main className="p-10">Loading report...</main>;
+
+  if (report.report_type === "historical") return (
+    <main className="sentinel-page space-y-6">
+      <div className="flex items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">Historical uploaded report</h1><p className="text-slate-600">{report.report_id}</p></div><Link href="/hospital/reports" className="rounded border bg-white px-4 py-2">Back to Reports</Link></div>
+      <section className="grid gap-4 rounded-xl border bg-white p-6 md:grid-cols-3">
+        <Info label="Patient" value={report.patient_name} /><Info label="Local Patient ID" value={report.patient_id} /><Info label="Referral ID" value={report.referral_id} />
+        <Info label="Clinic" value={report.clinic_name || "-"} /><Info label="Original report date" value={report.report_date || "-"} /><Info label="Original source" value={report.source_organization_name || "Not recorded"} />
+      </section>
+      <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950"><strong>Provenance:</strong> This PDF was uploaded as a historical external report. It was not authored or issued by Sentinel.{report.source_note ? <p className="mt-2">{report.source_note}</p> : null}</section>
+      <section className="rounded-xl border bg-white p-6"><h2 className="mb-3 text-xl font-semibold">Original document</h2><a href={report.document_url} target="_blank" rel="noreferrer" className="inline-flex rounded bg-slate-950 px-4 py-2 font-semibold text-white">Open historical PDF</a></section>
+    </main>
+  );
 
   return (
     <main className="sentinel-page space-y-6">

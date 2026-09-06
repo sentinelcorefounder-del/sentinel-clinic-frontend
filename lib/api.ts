@@ -1745,3 +1745,69 @@ export async function decideOpsHistoricalAccess(
 
   return data as HistoricalAccessRequest;
 }
+
+
+export type HistoricalReportDocument = {
+  id: number;
+  historical_report_id: string;
+  report_type: "historical";
+  encounter: number;
+  encounter_reference: string;
+  patient: number;
+  patient_reference: string;
+  patient_name: string;
+  hospital_referral?: number | null;
+  referral_id?: string | null;
+  referring_hospital_name?: string | null;
+  title: string;
+  report_date: string;
+  source_organization_name: string;
+  source_note: string;
+  original_filename: string;
+  hospital_visible: boolean;
+  uploaded_by_name: string;
+  document_url: string;
+  historical_finance?: {
+    payment_state: string; amount: string; amount_paid: string; currency: string;
+    payment_method: string; payment_reference: string; collecting_organization_id?: number | null;
+    collecting_organization_name?: string;
+  } | null;
+  created_at: string;
+};
+
+export async function fetchEncounterHistoricalReports(encounterId: string | number) {
+  const res = await fetch(`${API_URL}/reports/historical/encounter/${encounterId}/`, {
+    cache: "no-store", credentials: "include",
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load historical reports."));
+  return data as HistoricalReportDocument[];
+}
+
+export async function fetchPatientHistoricalReports(patientId: string | number) {
+  const res = await fetch(`${API_URL}/reports/historical/patient/${patientId}/`, {
+    cache: "no-store", credentials: "include",
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load patient historical reports."));
+  return data as HistoricalReportDocument[];
+}
+
+export async function uploadEncounterHistoricalReport(encounterId: string | number, formData: FormData) {
+  const { csrfToken } = await ensureCsrf();
+  const res = await fetch(`${API_URL}/reports/historical/encounter/${encounterId}/`, {
+    method: "POST", credentials: "include", headers: { "X-CSRFToken": csrfToken }, body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to upload historical report."));
+  return data as HistoricalReportDocument;
+}
+
+export async function fetchHospitalHistoricalReportById(id: string | number) {
+  const res = await fetch(`${API_URL}/referrals/hospital/historical-reports/${id}/`, {
+    cache: "no-store", credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load historical report."));
+  return data;
+}

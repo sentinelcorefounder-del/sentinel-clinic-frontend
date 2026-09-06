@@ -9,6 +9,8 @@ import {
   fetchPatientConsents,
   fetchPatientEncounters,
   fetchPatientReports,
+  fetchPatientHistoricalReports,
+  type HistoricalReportDocument,
   fetchPatientUploads,
   fetchPatientTimeline,
   getReportPdfUrl,
@@ -97,6 +99,7 @@ export default function PatientDetailPage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [encounters, setEncounters] = useState<Encounter[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [historicalReports, setHistoricalReports] = useState<HistoricalReportDocument[]>([]);
   const [consents, setConsents] = useState<Consent[]>([]);
   const [uploads, setUploads] = useState<ImageUpload[]>([]);
   const [timeline, setTimeline] = useState<PatientTimelineEvent[]>([]);
@@ -121,6 +124,7 @@ export default function PatientDetailPage() {
           patientData,
           encounterData,
           reportData,
+          historicalReportData,
           consentData,
           uploadData,
           timelineData,
@@ -129,6 +133,7 @@ export default function PatientDetailPage() {
             fetchPatientById(id),
             fetchPatientEncounters(id),
             fetchPatientReports(id),
+            fetchPatientHistoricalReports(id),
             fetchPatientConsents(id),
             fetchPatientUploads(id),
             fetchPatientTimeline(id, "clinic"),
@@ -138,6 +143,7 @@ export default function PatientDetailPage() {
         setPatient(patientData);
         setEncounters(encounterData);
         setReports(reportData);
+        setHistoricalReports(historicalReportData);
         setConsents(consentData);
         setUploads(uploadData);
         setTimeline(timelineData.events || []);
@@ -424,15 +430,27 @@ export default function PatientDetailPage() {
 
         <HistoryTable
           title="Reports"
-          rows={reports.map((report) => [
-            report.review_date,
-            <div key={`report-${report.id}`} className="space-y-2">
-              <p className="font-semibold">{report.report_id}</p>
-              <ReportFormatMenu reportId={report.id} role="clinic" />
-            </div>,
-            `R: ${pretty(report.right_dr_grade)} / L: ${pretty(report.left_dr_grade)}`,
-            pretty(report.report_status),
-          ])}
+          rows={[
+            ...reports.map((report) => [
+              report.review_date,
+              <div key={`report-${report.id}`} className="space-y-2">
+                <p className="font-semibold">{report.report_id}</p>
+                <ReportFormatMenu reportId={report.id} role="clinic" />
+              </div>,
+              `R: ${pretty(report.right_dr_grade)} / L: ${pretty(report.left_dr_grade)}`,
+              pretty(report.report_status),
+            ]),
+            ...historicalReports.map((report) => [
+              report.report_date,
+              <div key={`historical-report-${report.id}`} className="space-y-2">
+                <p className="font-semibold">{report.title}</p>
+                <p className="font-mono text-xs text-slate-500">{report.historical_report_id}</p>
+                <a href={report.document_url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue-700 underline">Open historical PDF</a>
+              </div>,
+              report.source_organization_name || "Historical source not recorded",
+              report.hospital_visible ? "Historical · shared to referral" : "Historical uploaded report",
+            ]),
+          ]}
         />
 
         <HistoryTable
