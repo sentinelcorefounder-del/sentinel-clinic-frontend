@@ -1374,6 +1374,30 @@ export async function markPatientDeliveryRequired(
 }
 
 
+
+export type EncounterDiabeticRecall = {
+  id: number; encounter_id: number; patient_pk: number; patient_id: string;
+  patient_name: string; patient_email: string; clinic_name: string;
+  recall_months: number; recall_due_date: string; recall_status: string;
+  recall_note: string; base_date: string; source_type: string; report_id: string;
+};
+
+export async function fetchEncounterDiabeticRecall(encounterId: string | number) {
+  const res = await fetch(`${API_URL}/reports/recalls/encounter/${encounterId}/`, { cache: "no-store", credentials: "include" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load diabetic recall."));
+  return data as EncounterDiabeticRecall | null;
+}
+
+export async function saveEncounterDiabeticRecall(encounterId: string | number, data: { recall_months: number; historical_report_id?: number; note?: string }) {
+  const res = await fetch(`${API_URL}/reports/recalls/encounter/${encounterId}/`, {
+    method: "POST", credentials: "include", headers: await getCsrfHeaders(true), body: JSON.stringify(data),
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to save diabetic recall."));
+  return responseData as EncounterDiabeticRecall;
+}
+
 export type RecallQueueItem = {
   id: number;
   report_id: string;

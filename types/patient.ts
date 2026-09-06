@@ -21,6 +21,9 @@ export type Patient = {
   consent_status: string;
   sentinel_patient_id?: string;
   master_patient_id?: number | null;
+  is_diabetic?: boolean;
+  next_diabetic_recall_due_date?: string | null;
+  diabetic_recall_status?: string;
 
   source_type: "clinic_direct" | "hospital_referral";
   referring_hospital_id?: number | null;

@@ -18,6 +18,9 @@ import {
   fetchEncounterHistoricalReports,
   uploadEncounterHistoricalReport,
   type HistoricalReportDocument,
+  fetchEncounterDiabeticRecall,
+  saveEncounterDiabeticRecall,
+  type EncounterDiabeticRecall,
 } from "@/lib/api";
 import { getMe, hasAnyRole, type CurrentUser } from "@/lib/auth";
 import { Encounter, OcularInvestigation } from "@/types/encounter";
@@ -40,7 +43,7 @@ type Props = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const ALLOWED_DELETE_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "super_admin"];
+const ALLOWED_DELETE_UPLOAD_ROLES = ["clinic_screener", "clinic_admin", "clinic_owner_optometrist", "super_admin"];
 
 function displayValue(value?: string | null) {
   if (!value) return "-";
@@ -131,6 +134,9 @@ export default function EncounterDetailPage({ params }: Props) {
   const [historicalReports, setHistoricalReports] = useState<HistoricalReportDocument[]>([]);
   const [ocularInvestigations, setOcularInvestigations] = useState<OcularInvestigation[]>([]);
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
+  const [diabeticRecall, setDiabeticRecall] = useState<EncounterDiabeticRecall | null>(null);
+  const [recallMonths, setRecallMonths] = useState("12");
+  const [recallMessage, setRecallMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -215,12 +221,13 @@ export default function EncounterDetailPage({ params }: Props) {
 
     const patientData = await fetchPatientById(String(encounterData.patient));
 
-    const [uploadData, reportData, historicalReportData, consentData, investigationData] = await Promise.all([
+    const [uploadData, reportData, historicalReportData, consentData, investigationData, recallData] = await Promise.all([
       fetchEncounterUploads(encounterId),
       fetchEncounterReports(encounterId),
       fetchEncounterHistoricalReports(encounterId),
       fetchEncounterConsents(encounterId),
       fetchOcularInvestigations(encounterId).catch(() => []),
+      fetchEncounterDiabeticRecall(encounterId).catch(() => null),
     ]);
 
     setEncounter(encounterData);
@@ -249,6 +256,8 @@ export default function EncounterDetailPage({ params }: Props) {
     setUploads(uploadData);
     setReports(reportData);
     setHistoricalReports(historicalReportData);
+    setDiabeticRecall(recallData);
+    if (recallData?.recall_months) setRecallMonths(String(recallData.recall_months));
     setConsents(consentData);
     setOcularInvestigations(investigationData);
   }
@@ -461,8 +470,24 @@ export default function EncounterDetailPage({ params }: Props) {
   const canEditClinicalIntake = Boolean(
     currentUser &&
       currentUser.organization?.organization_type === "clinic" &&
-      currentUser.roles?.some((role) => role === "optometrist" || role === "reviewer")
+      currentUser.roles?.some((role) => role === "optometrist" || role === "reviewer" || role === "clinic_owner_optometrist")
   );
+  async function saveDiabeticRecall() {
+    if (!encounter) return;
+    try {
+      setRecallMessage("");
+      const historical = historicalReports[0];
+      const saved = await saveEncounterDiabeticRecall(encounter.id, {
+        recall_months: Number(recallMonths),
+        ...(historical ? { historical_report_id: historical.id } : {}),
+      });
+      setDiabeticRecall(saved);
+      setRecallMessage("Diabetic recall saved.");
+    } catch (err) {
+      setRecallMessage(err instanceof Error ? err.message : "Failed to save diabetic recall.");
+    }
+  }
+
   const canCorrectPackage = canEditClinicalIntake && !encounter?.service_package_locked;
   const includesDiabetic = encounter?.service_package
     ? ["diabetic_retinal_assessment", "combined_diabetic_eye_health"].includes(encounter.service_package)
@@ -637,7 +662,7 @@ export default function EncounterDetailPage({ params }: Props) {
 
           {canEditClinicalIntake && editingClinicalIntake ? (
             <div className="grid gap-4">
-              {includesDiabetic || clinicalIntakeForm.diabetes_duration ? (
+              {encounter.is_diabetic || clinicalIntakeForm.diabetes_duration ? (
                 <label className="space-y-1">
                   <span className="text-sm font-medium">Diabetes duration</span>
                   <input
@@ -681,7 +706,7 @@ export default function EncounterDetailPage({ params }: Props) {
             </div>
           ) : (
             <dl className="grid gap-4 text-sm md:grid-cols-2">
-              {includesDiabetic || clinicalIntakeForm.diabetes_duration ? (
+              {encounter.is_diabetic || clinicalIntakeForm.diabetes_duration ? (
                 <div>
                   <dt className="font-medium text-slate-700">Diabetes duration</dt>
                   <dd className="mt-1 whitespace-pre-wrap text-slate-950">
@@ -705,6 +730,27 @@ export default function EncounterDetailPage({ params }: Props) {
           )}
         </div>
       </EncounterSection>
+
+
+      {encounter.is_diabetic ? <EncounterSection
+        sectionId="diabetic-recall"
+        title="Diabetic Recall"
+        status={diabeticRecall ? `${diabeticRecall.recall_months} months · ${displayValue(diabeticRecall.recall_status)}` : "Not scheduled"}
+        open={openSections.has("diabetic-recall")}
+        onToggle={() => toggleSection("diabetic-recall")}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">Set the diabetic recall after the encounter has been created. This works for ocular, combined, diabetic retinal and eye-health assessment templates when the patient is marked diabetic.</p>
+          <label className="block text-sm font-medium">Recall period
+            <select value={recallMonths} onChange={(event) => setRecallMonths(event.target.value)} className="mt-1 w-full rounded border p-2">
+              {[3,6,9,12,18,24].map((months) => <option key={months} value={months}>{months} months</option>)}
+            </select>
+          </label>
+          {diabeticRecall ? <p className="text-sm"><strong>Due:</strong> {diabeticRecall.recall_due_date} · <strong>Status:</strong> {displayValue(diabeticRecall.recall_status)}</p> : null}
+          <button type="button" onClick={() => void saveDiabeticRecall()} className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save diabetic recall</button>
+          {recallMessage ? <p className="text-sm">{recallMessage}</p> : null}
+        </div>
+      </EncounterSection> : null}
 
       <EncounterSection
         sectionId="technician"

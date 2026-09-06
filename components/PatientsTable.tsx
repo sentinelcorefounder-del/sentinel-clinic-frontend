@@ -34,6 +34,7 @@ export default function PatientsTable() {
   const [source, setSource] =
     useState<PatientSourceFilter>("all");
   const [pathway, setPathway] = useState<PathwayFilter>("all");
+  const [diabeticFilter, setDiabeticFilter] = useState<"all" | "yes" | "no">("all");
   const [hospitalId, setHospitalId] =
     useState<number | null>(null);
   const [hospitalLabelsOpen, setHospitalLabelsOpen] =
@@ -70,7 +71,8 @@ export default function PatientsTable() {
 
   async function loadPatients(
     nextSource = source,
-    nextHospitalId = hospitalId
+    nextHospitalId = hospitalId,
+    nextDiabetic = diabeticFilter
   ) {
     try {
       setLoading(true);
@@ -83,6 +85,7 @@ export default function PatientsTable() {
           nextSource === "hospital_referral"
             ? nextHospitalId
             : null,
+        diabetic: nextDiabetic,
       });
 
       setPatients(data);
@@ -170,6 +173,11 @@ export default function PatientsTable() {
         <p className="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
           Patient source
         </p>
+        <label className="mb-3 block px-3 text-xs font-bold uppercase tracking-wide text-slate-500">Diabetes status
+          <select value={diabeticFilter} onChange={async (event) => { const value=event.target.value as "all"|"yes"|"no"; setDiabeticFilter(value); await loadPatients(source, hospitalId, value); }} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-900">
+            <option value="all">All</option><option value="yes">Diabetic</option><option value="no">Non-diabetic</option>
+          </select>
+        </label>
 
         <SourceButton
           active={source === "all"}
@@ -321,6 +329,7 @@ export default function PatientsTable() {
                   <th className="p-4 text-sm font-semibold text-slate-900">
                     Patient
                   </th>
+                  <th className="p-4 text-sm font-semibold text-slate-900">Diabetes / Recall</th>
                   <th className="p-4 text-sm font-semibold text-slate-900">
                     Source
                   </th>
@@ -346,7 +355,7 @@ export default function PatientsTable() {
                 {!displayedPatients.length ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="p-6 text-sm text-slate-700"
                     >
                       No patients found for this source.
@@ -369,6 +378,13 @@ export default function PatientsTable() {
                         <p className="mt-1 text-xs text-slate-500">
                           {patient.patient_id}
                         </p>
+                      </td>
+
+                      <td className="p-4 text-sm">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${patient.is_diabetic ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"}`}>
+                          {patient.is_diabetic ? "Diabetic" : "Non-diabetic"}
+                        </span>
+                        {patient.next_diabetic_recall_due_date ? <p className="mt-2 text-xs text-slate-600">Recall {patient.next_diabetic_recall_due_date} · {(patient.diabetic_recall_status || "scheduled").replaceAll("_", " ")}</p> : null}
                       </td>
 
                       <td className="p-4">

@@ -75,6 +75,7 @@ export default function NewRetinalAssessmentPage() {
     useState<ServicePackage>("diabetic_retinal_assessment");
 
   const [assessmentDate, setAssessmentDate] = useState(today());
+  const [isDiabetic, setIsDiabetic] = useState(false);
   const [diabetesDuration, setDiabetesDuration] = useState("");
   const [symptomsNotes, setSymptomsNotes] = useState("");
   const [clinicalNotes, setClinicalNotes] = useState("");
@@ -294,7 +295,8 @@ export default function NewRetinalAssessmentPage() {
           effectiveSource === "hospital_referral"
             ? "hospital"
             : profile.default_payment_responsibility,
-        diabetes_duration: diabetesDuration,
+        is_diabetic: isDiabetic,
+        diabetes_duration: isDiabetic ? diabetesDuration : "",
         symptoms_notes: symptomsNotes,
         clinical_notes: clinicalNotes,
       });
@@ -580,15 +582,22 @@ export default function NewRetinalAssessmentPage() {
               className="w-full rounded-xl border p-3"
             />
           </label>
-          {["diabetic_retinal_assessment", "combined_diabetic_eye_health"].includes(servicePackage) ? <label>
-            <span className="mb-1 block text-sm font-medium">
-              Diabetes duration
-            </span>
+          <label>
+            <span className="mb-1 block text-sm font-medium">Diabetic</span>
+            <select
+              value={isDiabetic ? "yes" : "no"}
+              onChange={(event) => setIsDiabetic(event.target.value === "yes")}
+              className="w-full rounded-xl border p-3"
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </label>
+          {isDiabetic ? <label>
+            <span className="mb-1 block text-sm font-medium">Diabetes duration</span>
             <input
               value={diabetesDuration}
-              onChange={(event) =>
-                setDiabetesDuration(event.target.value)
-              }
+              onChange={(event) => setDiabetesDuration(event.target.value)}
               className="w-full rounded-xl border p-3"
             />
           </label> : null}

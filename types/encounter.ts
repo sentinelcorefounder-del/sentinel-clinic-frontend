@@ -65,6 +65,7 @@ export type Encounter = {
   source_overridden_by?: number | null;
   source_overridden_at?: string | null;
   screening_status: string;
+  is_diabetic: boolean;
   diabetes_duration?: string;
   symptoms_notes?: string;
   clinical_notes?: string;
