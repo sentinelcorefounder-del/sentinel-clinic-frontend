@@ -13,6 +13,12 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
   const [category, setCategory] = useState("other_operating_expense");
   const [purpose, setPurpose] = useState("");
   const [destination, setDestination] = useState("");
+  const [reversalTarget, setReversalTarget] = useState<TreasuryTransfer | null>(null);
+  const [reversalKey, setReversalKey] = useState("");
+  const [reversalKind, setReversalKind] = useState("returned_funds");
+  const [reversalReason, setReversalReason] = useState("");
+  const [reversalReference, setReversalReference] = useState("");
+  const [reversalEvidence, setReversalEvidence] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [executionTarget, setExecutionTarget] = useState<TreasuryTransfer | null>(null);
@@ -37,6 +43,14 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
     setBusy(true); setError("");
     try { await financeWrite(`/api/finance/treasury-transfers/${id}/${action}/`, "POST", body); location.reload(); }
     catch (value) { setError(value instanceof Error ? value.message : "Action failed."); setBusy(false); }
+  }
+
+  async function reversalAction(id: number, action: string) {
+    const reason = ["reject", "cancel"].includes(action) ? prompt("Decision reason") : undefined;
+    if (["reject", "cancel"].includes(action) && !reason) return;
+    setBusy(true); setError("");
+    try { await financeWrite(`/api/finance/action-requests/${id}/${action}/`, "POST", reason ? { reason } : {}); location.reload(); }
+    catch (value) { setError(value instanceof Error ? value.message : "Reversal action failed."); setBusy(false); }
   }
 
   async function recordPayment(event: React.FormEvent) {
@@ -76,11 +90,43 @@ export default function TreasuryTransferManager({ items, wallets, capabilities }
         {item.status==="submitted"&&capabilities.can_approve&&<><button disabled={busy} onClick={()=>act(item.id,"approve")} className="rounded bg-green-700 px-3 py-1.5 text-xs font-semibold text-white">Approve</button><button disabled={busy} onClick={()=>{const value=prompt("Rejection reason");if(value)act(item.id,"reject",{reason:value})}} className="rounded bg-red-700 px-3 py-1.5 text-xs font-semibold text-white">Reject</button></>}
         {item.status==="approved"&&capabilities.can_operate&&<button disabled={busy} onClick={()=>{setExecutionTarget(item);setExecutionDate(new Date().toISOString().slice(0,10));setExecutionReference("");setExecutionEvidence(null)}} className="rounded bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white">Record payment</button>}
         {["draft","submitted","approved"].includes(item.status)&&capabilities.can_operate&&<button disabled={busy} onClick={()=>{const value=prompt("Cancellation reason");if(value)act(item.id,"cancel",{reason:value})}} className="rounded border px-3 py-1.5 text-xs font-semibold">Cancel</button>}
-        {item.status==="executed"&&capabilities.can_approve&&<button disabled={busy} onClick={()=>{const value=prompt("Reversal reason");if(value)act(item.id,"reverse",{reason:value})}} className="rounded border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-800">Record reversal</button>}
+        {item.status==="executed"&&capabilities.can_operate&&!item.reversal_requests?.some(r=>["draft","pending","authorized","executed"].includes(r.status))&&<button disabled={busy} onClick={()=>{setReversalTarget(item);setReversalKey(crypto.randomUUID());setReversalReason("");setReversalReference("");setReversalEvidence(null)}} className="rounded border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-800">Request reversal</button>}
         {item.evidence_available&&<button disabled={busy} onClick={()=>downloadFinanceFile(`/api/finance/treasury-transfers/${item.id}/evidence/`,`${item.transfer_reference}-evidence`)} className="rounded border px-3 py-1.5 text-xs font-semibold">Payment evidence</button>}
       </div>
+      {item.reversal_requests?.map(reversal=><div key={reversal.id} className="mt-4 rounded border p-3 text-sm">
+        <p className="font-semibold">Reversal #{reversal.id} · {reversal.status === "authorized" ? "Approved, awaiting execution" : reversal.status}</p>
+        <p>{reversal.reversal_kind === "returned_funds" ? "Returned funds" : "Incorrect debit correction"} · {reversal.external_reference}</p>
+        <p>{reversal.reason} · Requested by {reversal.requested_by_username}</p>
+        {reversal.status !== "executed" && <p>Cash has not changed for this request.</p>}
+        <div className="mt-2 flex gap-2">
+          {reversal.evidence_available && <button disabled={busy} onClick={()=>downloadFinanceFile(`/api/finance/action-requests/${reversal.id}/evidence-download/`, `reversal-${reversal.id}-evidence`)} className="rounded border px-3 py-1">Review evidence</button>}
+          {reversal.status === "draft" && capabilities.can_operate && <button disabled={busy} onClick={()=>reversalAction(reversal.id,"submit")} className="rounded border px-3 py-1">Submit reversal</button>}
+          {reversal.status === "pending" && capabilities.can_approve && <><button disabled={busy} onClick={()=>reversalAction(reversal.id,"approve")} className="rounded border px-3 py-1">Approve reversal</button><button disabled={busy} onClick={()=>reversalAction(reversal.id,"reject")} className="rounded border px-3 py-1">Reject</button></>}
+          {["draft","pending"].includes(reversal.status) && capabilities.can_operate && <button disabled={busy} onClick={()=>reversalAction(reversal.id,"cancel")} className="rounded border px-3 py-1">Cancel request</button>}
+          {reversal.status === "authorized" && capabilities.can_operate && <button disabled={busy} onClick={()=>reversalAction(reversal.id,"execute")} className="rounded bg-red-700 px-3 py-1 text-white">Execute approved reversal</button>}
+        </div>
+      </div>)}
     </article>)}{!items.length&&<p className="rounded-2xl border bg-white p-6 text-sm text-slate-600">No treasury payments recorded.</p>}</section>
 
+    {reversalTarget && <form className="rounded-xl border bg-white p-5 space-y-3" onSubmit={async event => {
+      event.preventDefault(); if (!reversalEvidence) return;
+      const form = new FormData(); form.append("reversal_kind", reversalKind); form.append("reason", reversalReason);
+      form.append("idempotency_key", reversalKey); form.append("reversal_reference", reversalReference); form.append("evidence", reversalEvidence);
+      setBusy(true); setError("");
+      try { await financeWriteForm(`/api/finance/treasury-transfers/${reversalTarget.id}/reversal-requests/`, form); location.reload(); }
+      catch (e) { setError(e instanceof Error ? e.message : "Reversal failed"); setBusy(false); }
+    }}>
+      <h2 className="font-bold">Evidence for reversal · {reversalTarget.transfer_reference}</h2>
+      <select aria-label="Reversal type" value={reversalKind} onChange={e=>setReversalKind(e.target.value)} className="block w-full border p-2">
+        <option value="returned_funds">Funds actually returned</option><option value="bookkeeping_correction">Original debit was recorded incorrectly</option>
+      </select>
+      <p className="text-sm">Returned funds require receipt evidence. A bookkeeping correction requires evidence that the original debit overstated cash paid. The creator and payment recorder cannot authorize this reversal. Submit the draft for independent approval. Cash changes only when a separate operator executes the approved reversal.</p>
+      <input required aria-label="Independent reversal reference" placeholder="Independent reference" value={reversalReference} onChange={e=>setReversalReference(e.target.value)} className="block w-full border p-2" />
+      <textarea required aria-label="Reversal reason" placeholder="Reason" value={reversalReason} onChange={e=>setReversalReason(e.target.value)} className="block w-full border p-2" />
+      <input required aria-label="Reversal evidence" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>setReversalEvidence(e.target.files?.[0]||null)} />
+      <button disabled={busy} className="rounded bg-red-700 px-4 py-2 text-white">Create reversal draft</button>
+      <button type="button" onClick={()=>setReversalTarget(null)} className="ml-3">Cancel</button>
+    </form>}
     {executionTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
       <form onSubmit={recordPayment} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <h2 className="text-xl font-bold">Record payment</h2><p className="mt-1 text-sm text-slate-600">{executionTarget.transfer_reference} · {money(executionTarget.amount)} · {executionTarget.destination_label}</p>

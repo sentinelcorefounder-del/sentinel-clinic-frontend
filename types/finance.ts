@@ -120,6 +120,7 @@ export type EncounterSponsorship = {
 };
 
 export type TreasuryTransfer = {
+  reversal_requests?: { id: number; status: string; reversal_kind: string; external_reference: string; reason: string; requested_by_username: string; evidence_available: boolean }[];
   id: number; transfer_reference: string; wallet: number; wallet_name: string; amount: string;
   currency: string; category: string; purpose: string; destination_label: string; external_reference: string;
   status: string; available_surplus_snapshot: Record<string, string>; created_by_name: string;

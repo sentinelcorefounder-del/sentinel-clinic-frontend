@@ -16,6 +16,7 @@ const groups = [
     ["Founder expenses","Record founder-paid costs and controlled reimbursements.","/ops/finance/founder-expenses"],
   ]},
   { title: "Pricing & agreements", items: [
+    ["Complimentary services","Approve non-cash services with no Treasury movement.","/ops/finance/complimentary"],
     ["Contracts & service pricing","Set organisation-specific prices for each assessment service and AI add-on.","/ops/finance/contracts"],
     ["Setup wizard","Onboard a hospital or clinic.","/ops/finance/setup"],
     ["Service allowances","Control temporary pre-funding authority.","/ops/finance/allowances"],
