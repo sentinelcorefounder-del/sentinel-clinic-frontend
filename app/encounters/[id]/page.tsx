@@ -28,13 +28,12 @@ import { ImageUpload } from "@/types/upload";
 import { StructuredReport } from "@/types/report";
 import { ConsentRecord } from "@/types/consent";
 import ImageUploadForm from "@/components/ImageUploadForm";
-import ReportForm from "@/components/ReportForm";
 import ConsentForm from "@/components/ConsentForm";
 import OcularAssessmentForm from "@/components/OcularAssessmentForm";
+import ClinicalReportWorkspace from "@/components/ClinicalReportWorkspace";
 import OcularInvestigationsAIReview from "@/components/OcularInvestigationsAIReview";
 import RemidioMobileTransfer from "@/components/RemidioMobileTransfer";
 import OnwardReferralManager from "@/components/OnwardReferralManager";
-import EyeHealthScreeningReportForm from "@/components/EyeHealthScreeningReportForm";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -291,7 +290,7 @@ export default function EncounterDetailPage({ params }: Props) {
       consent: "record-consents",
       ocular: "ocular-assessment",
       "ocular-ai": "ocular-investigations",
-      report: "retinal-report",
+      report: "clinical-report",
       referral: "onward-referral",
     };
     const requested = new URLSearchParams(window.location.search).get("section")
@@ -299,7 +298,7 @@ export default function EncounterDetailPage({ params }: Props) {
     if (requested) {
       expandSection(aliases[requested] || requested, true);
     } else if (reports.some((report) => report.return_reason || report.ops_review_note)) {
-      expandSection("retinal-report");
+      expandSection("clinical-report");
     }
   }, [expandSection, loading, reports]);
 
@@ -623,7 +622,7 @@ export default function EncounterDetailPage({ params }: Props) {
       {reports.some((report) => report.return_reason || report.ops_review_note) ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
           <p className="font-semibold">Retinal report requires attention</p>
-          <p className="mt-1">Open Retinal Report or Structured Reports to review the Sentinel Ops note.</p>
+          <p className="mt-1">Open Clinical Report to review the Sentinel Ops note.</p>
         </div>
       ) : null}
 
@@ -1182,6 +1181,7 @@ export default function EncounterDetailPage({ params }: Props) {
           }
           fundusUploads={uploads}
           ocularInvestigations={ocularInvestigations}
+          showReportControls={false}
         />
         </EncounterSection>
       ) : null}
@@ -1205,165 +1205,31 @@ export default function EncounterDetailPage({ params }: Props) {
         </EncounterSection>
       ) : null}
 
-      {includesDiabetic ? <EncounterSection
-        sectionId="retinal-report"
-        title="Optometrist Report: Diabetic Grading"
-        status={reports[0]?.report_status ? displayValue(reports[0].report_status) : "Not started"}
-        open={openSections.has("retinal-report")}
-        onToggle={() => toggleSection("retinal-report")}
-      >
-      <div className="rounded-lg p-1 sm:p-2">
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">Optometrist Report: Diabetic Grading</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            The optometrist completes diabetic grading and clinical recommendation here.
-            VA, IOP and image capture are handled above on the encounter.
-          </p>
-        </div>
-
-        <ReportForm
-          encounterId={encounter.id}
-          patientId={encounter.patient}
-          patientConsentStatus={patient.consent_status || "pending"}
-          workflowRoute={encounterAny.workflow_route || "sentinel_managed"}
-          encounter={encounterAny}
-          existingReport={reports[0] || null}
-          onReportSaved={handleReportCreated}
-          programme={encounter.programme}
-          fundusUploads={uploads}
-          ocularInvestigations={ocularInvestigations}
-        />
-      </div>
-      </EncounterSection> : null}
-
-      {includesEyeHealth ? <EncounterSection
-        sectionId="eye-health-report"
-        title="Targeted Retinal and Glaucoma-Risk Screening Report"
-        status={displayValue(encounter.targeted_screening_report_status || "not_started")}
-        open={openSections.has("eye-health-report")}
-        onToggle={() => toggleSection("eye-health-report")}
-      >
-        <EyeHealthScreeningReportForm
-          encounterId={encounter.id}
-          uploads={uploads}
-          investigations={ocularInvestigations}
-          canEdit={canEditClinicalIntake}
-          combined={encounter.service_package === "combined_diabetic_eye_health"}
-        />
-      </EncounterSection> : null}
-
-      {includesDiabetic ? <EncounterSection
-        sectionId="structured-reports"
-        title="Structured Reports"
-        status={reports.length ? `${reports.length} report${reports.length === 1 ? "" : "s"}` : "Not started"}
-        open={openSections.has("structured-reports")}
-        onToggle={() => toggleSection("structured-reports")}
-      >
-      <div className="rounded-lg p-1 sm:p-2">
-        <h2 className="mb-4 text-xl font-semibold">Structured Reports</h2>
-
-        {reports.length === 0 ? (
-          <p>No reports created yet.</p>
-        ) : (
-          <div className="space-y-4">
-            {reports.map((report) => (
-              <div key={report.id} className="space-y-3 rounded-lg border p-4">
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <p>
-                      <strong>Report ID:</strong> {report.report_id}
-                    </p>
-                    <p>
-                      <strong>Review Date:</strong> {report.review_date}
-                    </p>
-                    <p>
-                      <strong>Urgency:</strong> {displayValue(report.urgency_outcome)}
-                    </p>
-                    <p>
-                      <strong>Status:</strong> {displayValue(report.report_status)}
-                    </p>
-                    {report.return_reason || report.ops_review_note ? (
-                      <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        <p className="font-semibold">Sentinel Ops review note</p>
-                        <p>{report.return_reason || report.ops_review_note}</p>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded border bg-slate-50 p-3 text-sm">
-                      <p className="mb-2 font-semibold">Left Eye Grading</p>
-                      <p>
-                        <strong>DR Grade:</strong> {report.left_dr_grade || "-"}
-                      </p>
-                      <p>
-                        <strong>Maculopathy:</strong>{" "}
-                        {report.left_maculopathy_grade || "-"}
-                      </p>
-                    </div>
-
-                    <div className="rounded border bg-slate-50 p-3 text-sm">
-                      <p className="mb-2 font-semibold">Right Eye Grading</p>
-                      <p>
-                        <strong>DR Grade:</strong> {report.right_dr_grade || "-"}
-                      </p>
-                      <p>
-                        <strong>Maculopathy:</strong>{" "}
-                        {report.right_maculopathy_grade || "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded border bg-slate-50 p-3 text-sm">
-                    <p className="mb-2 font-semibold">Assessment VA Summary</p>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <p>
-                          <strong>Left Unaided VA:</strong>{" "}
-                          {encounterAny.left_unaided_va || "-"}
-                        </p>
-                        <p>
-                          <strong>Left Corrected/Pinhole VA:</strong>{" "}
-                          {encounterAny.left_corrected_pinhole_va || "-"}
-                        </p>
-                        <p>
-                          <strong>Method:</strong>{" "}
-                          {displayValue(encounterAny.left_va_method) || "-"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p>
-                          <strong>Right Unaided VA:</strong>{" "}
-                          {encounterAny.right_unaided_va || "-"}
-                        </p>
-                        <p>
-                          <strong>Right Corrected/Pinhole VA:</strong>{" "}
-                          {encounterAny.right_corrected_pinhole_va || "-"}
-                        </p>
-                        <p>
-                          <strong>Method:</strong>{" "}
-                          {displayValue(encounterAny.right_va_method) || "-"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p>
-                      <strong>Recommendation:</strong> {report.recommendation || "-"}
-                    </p>
-                    <p>
-                      <strong>Notes:</strong> {report.notes || "-"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      </EncounterSection> : null}
+      {(includesDiabetic || includesEyeHealth || isComprehensiveOcular) ? (
+        <EncounterSection
+          sectionId="clinical-report"
+          title="Clinical Report"
+          status={reports[0]?.report_status ? displayValue(reports[0].report_status) : (encounter.targeted_screening_report_status ? displayValue(encounter.targeted_screening_report_status) : (encounter.ocular_assessment?.completed_at ? "Clinical record complete" : "Not started"))}
+          open={openSections.has("clinical-report")}
+          onToggle={() => toggleSection("clinical-report")}
+        >
+          <ClinicalReportWorkspace
+            encounter={encounterAny}
+            patientConsentStatus={patient.consent_status || "pending"}
+            uploads={uploads}
+            ocularInvestigations={ocularInvestigations}
+            reports={reports}
+            canEdit={canEditClinicalIntake}
+            includesDiabetic={includesDiabetic}
+            includesEyeHealth={includesEyeHealth}
+            isComprehensiveOcular={isComprehensiveOcular}
+            onReportSaved={handleReportCreated}
+            onOcularAssessmentSaved={(assessment) =>
+              setEncounter((current) => current ? { ...current, ocular_assessment: assessment } : current)
+            }
+          />
+        </EncounterSection>
+      ) : null}
 
 
       <EncounterSection

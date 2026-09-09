@@ -12,6 +12,7 @@ type Props = {
   onSaved: (assessment: OcularDiagnosticAssessment) => void;
   fundusUploads?: ImageUpload[];
   ocularInvestigations?: OcularInvestigation[];
+  showReportControls?: boolean;
 };
 
 const emptyAssessment = {
@@ -42,6 +43,7 @@ export default function OcularAssessmentForm({
   onSaved,
   fundusUploads = [],
   ocularInvestigations = [],
+  showReportControls = true,
 }: Props) {
   const [form, setForm] = useState({ ...emptyAssessment, ...(initial || {}) });
   const [saving, setSaving] = useState(false);
@@ -80,8 +82,8 @@ export default function OcularAssessmentForm({
     <section className="rounded-lg border p-6">
       <h2 className="text-xl font-semibold">Comprehensive Ocular Assessment Clinical Record</h2>
       <p className="mt-1 text-sm text-gray-600">
-        Clinic-owned findings for general ocular care. This record is separate
-        from diabetic grading and the hospital report-release queue.
+        Record the clinical findings for the ocular assessment here. Report configuration,
+        sign-off and release are handled in the consolidated Clinical Report workspace.
       </p>
 
       {error ? <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
@@ -145,6 +147,7 @@ export default function OcularAssessmentForm({
         </label>
       </div>
 
+      {showReportControls ? (
       <section className="mt-5 rounded-lg border bg-slate-50 p-4">
         <h3 className="font-semibold">Printable Report Content</h3>
         <p className="mt-1 text-sm text-slate-600">
@@ -226,6 +229,7 @@ export default function OcularAssessmentForm({
           </div>
         ) : null}
       </section>
+      ) : null}
 
       <div className="mt-5 flex flex-wrap gap-3">
         <button type="button" disabled={saving} onClick={() => save(false)} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
@@ -234,7 +238,7 @@ export default function OcularAssessmentForm({
         <button type="button" disabled={saving} onClick={() => save(true)} className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
           Complete ocular assessment
         </button>
-        {initial?.id ? (
+        {showReportControls && initial?.id ? (
           <button
             type="button"
             onClick={() => window.open(getOcularAssessmentPdfUrl(encounterId), "_blank", "noopener,noreferrer")}
