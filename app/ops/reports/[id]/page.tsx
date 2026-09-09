@@ -30,11 +30,6 @@ export default function OpsReportReviewPage({
   const [id, setId] = useState("");
   const [report, setReport] = useState<OpsReport | null>(null);
   const [note, setNote] = useState("");
-  const [signature, setSignature] = useState({
-    signer_name: "",
-    signer_role: "",
-    signer_registration_number: "",
-  });
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -69,34 +64,18 @@ export default function OpsReportReviewPage({
       }
 
       if (kind === "issue") {
-        if (
-          !signature.signer_name.trim() ||
-          !signature.signer_role.trim() ||
-          !signature.signer_registration_number.trim()
-        ) {
-          throw new Error(
-            "Clinician name, professional role and registration number are required."
-          );
-        }
-
         const confirmed = window.confirm(
           [
-            "Approve, sign and issue this report?",
+            "Approve and issue this clinician-signed report?",
             "",
-            "After issue:",
-            "• The report will become read-only.",
-            "• The electronic signature will be permanently recorded.",
-            "• The final PDF will show the Sentinel reviewer's details.",
+            "The clinician's existing immutable sign-off will be preserved.",
+            "Sentinel Ops is reviewing and authorising release; Ops is not the clinical signer.",
             "",
             "Continue?",
           ].join("\n")
         );
-
-        if (!confirmed) {
-          return;
-        }
-
-        await approveAndIssueOpsReport(id, note, signature, activeReport.lock_version, submittedVersion);
+        if (!confirmed) return;
+        await approveAndIssueOpsReport(id, note, activeReport.lock_version, submittedVersion);
       }
 
       if (kind === "reject") {
@@ -105,14 +84,6 @@ export default function OpsReportReviewPage({
 
       await load(id);
       setNote("");
-
-      if (kind === "issue") {
-        setSignature({
-          signer_name: "",
-          signer_role: "",
-          signer_registration_number: "",
-        });
-      }
 
       setMessage(
         kind === "return"
@@ -137,12 +108,7 @@ export default function OpsReportReviewPage({
   const canReview = report.report_status === "submitted_to_ops";
   const canIssue = report.report_status === "submitted_to_ops" && Boolean(report.submitted_version);
 
-  const issueDisabled =
-    busy ||
-    !canIssue ||
-    !signature.signer_name.trim() ||
-    !signature.signer_role.trim() ||
-    !signature.signer_registration_number.trim();
+  const issueDisabled = busy || !canIssue;
 
   return (
     <main className="space-y-6">
@@ -293,60 +259,9 @@ export default function OpsReportReviewPage({
         ) : null}
 
         {canIssue ? (
-          <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h3 className="font-semibold text-blue-950">
-              Clinical Sign-off
-            </h3>
-
-            <p className="mt-1 text-sm text-blue-900">
-              The Sentinel clinician reviewing this report must enter
-              their professional details before final issue.
-            </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <input
-                type="text"
-                value={signature.signer_name}
-                onChange={(event) =>
-                  setSignature((current) => ({
-                    ...current,
-                    signer_name: event.target.value,
-                  }))
-                }
-                placeholder="Clinician full name"
-                className="rounded border bg-white px-3 py-2"
-                disabled={busy}
-              />
-
-              <input
-                type="text"
-                value={signature.signer_role}
-                onChange={(event) =>
-                  setSignature((current) => ({
-                    ...current,
-                    signer_role: event.target.value,
-                  }))
-                }
-                placeholder="Professional role"
-                className="rounded border bg-white px-3 py-2"
-                disabled={busy}
-              />
-
-              <input
-                type="text"
-                value={signature.signer_registration_number}
-                onChange={(event) =>
-                  setSignature((current) => ({
-                    ...current,
-                    signer_registration_number:
-                      event.target.value,
-                  }))
-                }
-                placeholder="Registration number"
-                className="rounded border bg-white px-3 py-2"
-                disabled={busy}
-              />
-            </div>
+          <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+            <h3 className="font-semibold">Ops clinical-governance review</h3>
+            <p className="mt-1">The report is already signed by the responsible clinician. Approving here preserves that clinician sign-off and records Sentinel Ops as reviewer/issuer only.</p>
           </div>
         ) : null}
 
@@ -414,7 +329,7 @@ export default function OpsReportReviewPage({
               opacity: issueDisabled ? 0.45 : 1,
             }}
           >
-            {busy ? "Processing..." : "Approve, Sign and Issue"}
+            {busy ? "Processing..." : "Approve & Issue"}
           </button>
         </div>
       </section>

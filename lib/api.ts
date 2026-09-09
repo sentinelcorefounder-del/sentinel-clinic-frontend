@@ -956,16 +956,9 @@ export async function returnOpsReport(reportId: string | number, reason: string,
   return data;
 }
 
-export type OpsReportSignature = {
-  signer_name: string;
-  signer_role: string;
-  signer_registration_number: string;
-};
-
 export async function approveAndIssueOpsReport(
   reportId: string | number,
   note: string,
-  signature: OpsReportSignature,
   expectedVersion: number,
   submittedVersion: number
 ) {
@@ -977,10 +970,6 @@ export async function approveAndIssueOpsReport(
       headers: await getCsrfHeaders(true),
       body: JSON.stringify({
         note,
-        signer_name: signature.signer_name,
-        signer_role: signature.signer_role,
-        signer_registration_number:
-          signature.signer_registration_number,
         expected_version: expectedVersion,
         submitted_version: submittedVersion,
       }),

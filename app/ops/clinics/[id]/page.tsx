@@ -3,6 +3,7 @@
 import OrganizationFinanceCard from "@/components/OrganizationFinanceCard";
 import OrganizationBrandingEditor from "@/components/OrganizationBrandingEditor";
 import OrganizationBranchManager from "@/components/OrganizationBranchManager";
+import ClinicStaffManager from "@/components/ClinicStaffManager";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -244,6 +245,7 @@ export default function OpsClinicDetailPage() {
         onSaved={() => loadClinic()}
       />
       <OrganizationBranchManager organizationId={clinic.id} />
+      <ClinicStaffManager organizationId={clinic.id} mode="ops" />
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="mb-5">

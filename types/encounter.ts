@@ -97,6 +97,14 @@ export type OcularDiagnosticAssessment = {
   attachment_captions: Record<string, string>;
   completed_at?: string | null;
   completed_by_display?: string;
+  report_status?: "draft" | "awaiting_ops" | "ops_approved" | "returned_to_clinic" | "issued" | string;
+  signed_at?: string | null;
+  signer_snapshot?: Record<string, unknown>;
+  submitted_to_ops_at?: string | null;
+  ops_reviewed_at?: string | null;
+  ops_review_note?: string;
+  issued_at?: string | null;
+  current_version?: number | null;
 };
 
 export type OcularInvestigation = {

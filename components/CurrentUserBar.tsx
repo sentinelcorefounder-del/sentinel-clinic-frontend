@@ -139,6 +139,14 @@ function ClinicNav({ user }: { user: CurrentUser }) {
       <Link href="/finance" className="hover:text-slate-950 hover:underline">
         Finance
       </Link>
+      <Link href="/settings/profile" className="hover:text-slate-950 hover:underline">
+        Professional Profile
+      </Link>
+      {user.roles?.some((role) => ["clinic_admin", "clinic_owner_optometrist"].includes(role)) ? (
+        <Link href="/settings/staff" className="hover:text-slate-950 hover:underline">
+          Staff & Permissions
+        </Link>
+      ) : null}
 
       {isOps ? (
         <Link

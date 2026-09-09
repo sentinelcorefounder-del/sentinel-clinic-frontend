@@ -160,11 +160,19 @@ export type EyeHealthScreeningReport = {
   clean_pdf_ready: boolean;
   hospital_released_version?: number | null;
   hospital_released_at?: string | null;
+  review_status?: "legacy" | "awaiting_ops" | "approved" | "returned_to_clinic" | string;
+  submitted_to_ops_at?: string | null;
+  ops_reviewed_at?: string | null;
+  ops_review_note?: string;
+  signed_at?: string | null;
+  issued_at?: string | null;
   professional_defaults: null | {
     display_name: string;
     professional_role: string;
     registration_number: string;
+    registration_body?: string;
     qualifications: string;
+    signature_name?: string;
   };
   finalized_version_detail?: {
     version_number: number;

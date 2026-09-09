@@ -48,6 +48,8 @@ export default function OcularReportControls({
     );
   }
 
+  const reportLocked = ["awaiting_ops", "issued", "ops_approved"].includes(assessment.report_status || "");
+
   async function save() {
     try {
       setSaving(true);
@@ -72,6 +74,8 @@ export default function OcularReportControls({
         </p>
       </div>
 
+      {assessment.report_status ? <div className={`rounded-lg border p-4 text-sm ${assessment.report_status === "awaiting_ops" ? "border-blue-200 bg-blue-50 text-blue-950" : assessment.report_status === "returned_to_clinic" ? "border-amber-200 bg-amber-50 text-amber-950" : assessment.report_status === "issued" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "bg-slate-50"}`}><strong>Report workflow:</strong> {assessment.report_status.replaceAll("_", " ")}{assessment.report_status === "awaiting_ops" ? " — signed by the clinician and awaiting Sentinel Ops review." : assessment.report_status === "returned_to_clinic" ? " — returned for clinician correction." : assessment.report_status === "issued" ? " — clinically issued." : ""}{assessment.ops_review_note ? <p className="mt-2"><strong>Ops note:</strong> {assessment.ops_review_note}</p> : null}</div> : null}
+
       <div className="rounded-lg border bg-slate-50 p-4">
         <p className="font-medium">Report content</p>
         <div className="mt-3 flex flex-wrap gap-5">
@@ -79,6 +83,7 @@ export default function OcularReportControls({
             <label key={layout} className="flex items-center gap-2 text-sm">
               <input
                 type="radio"
+                disabled={reportLocked}
                 checked={form.report_layout === layout}
                 onChange={() => setForm((current) => ({
                   ...current,
@@ -108,6 +113,7 @@ export default function OcularReportControls({
                   <label className="flex items-center gap-2 text-sm font-medium">
                     <input
                       type="checkbox"
+                      disabled={reportLocked}
                       checked={selected}
                       onChange={(event) => setForm((current) => ({
                         ...current,
@@ -118,6 +124,7 @@ export default function OcularReportControls({
                   </label>
                   {selected ? (
                     <input
+                      disabled={reportLocked}
                       value={form.attachment_captions[captionKey] || ""}
                       onChange={(event) => setForm((current) => ({
                         ...current,
@@ -138,7 +145,7 @@ export default function OcularReportControls({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
+        <button type="button" disabled={saving || reportLocked} onClick={() => void save()} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
           {saving ? "Saving..." : "Save report configuration"}
         </button>
         <button

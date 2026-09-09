@@ -10,6 +10,18 @@ export type UserOrganization = {
   is_active: boolean;
 };
 
+export type ClinicalProfessionalProfile = {
+  display_name: string;
+  professional_role: string;
+  registration_number: string;
+  registration_body: string;
+  qualifications: string;
+  signature_name: string;
+  is_verified: boolean;
+  verified_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type CurrentUser = {
   id: number;
   username: string;
@@ -19,6 +31,7 @@ export type CurrentUser = {
   is_internal_sentinel_staff: boolean;
   must_change_password: boolean;
   roles: string[];
+  clinical_profile: ClinicalProfessionalProfile | null;
   organization: UserOrganization | null;
 };
 
