@@ -19,6 +19,8 @@ import type {
 type Props = {
   encounterId: number;
   assessment?: OcularDiagnosticAssessment | null;
+  allowedInvestigationTypes?: Array<"visual_field" | "oct" | "anterior_segment" | "other">;
+  enableAIReview?: boolean;
   fundusUploads?: Array<{
     id: number;
     eye_laterality: string;
@@ -30,6 +32,8 @@ type Props = {
 export default function OcularInvestigationsAIReview({
   encounterId,
   assessment,
+  allowedInvestigationTypes = ["visual_field", "oct", "anterior_segment", "other"],
+  enableAIReview = false,
   fundusUploads = [],
 }: Props) {
   const [investigations, setInvestigations] = useState<OcularInvestigation[]>([]);
@@ -63,14 +67,16 @@ export default function OcularInvestigationsAIReview({
   });
 
   async function refresh() {
-    const [loadedInvestigations, loadedReviewData] = await Promise.all([
-      fetchOcularInvestigations(encounterId),
-      fetchOcularAIReviews(encounterId),
-    ]);
+    const loadedInvestigations = await fetchOcularInvestigations(encounterId);
     setInvestigations(loadedInvestigations);
-    setReviews(loadedReviewData.reviews);
-    setAiPrice(loadedReviewData.pricing);
-    setConsent(loadedReviewData.consent);
+    if (enableAIReview) {
+      const loadedReviewData = await fetchOcularAIReviews(encounterId);
+      setReviews(loadedReviewData.reviews);
+      setAiPrice(loadedReviewData.pricing);
+      setConsent(loadedReviewData.consent);
+    } else {
+      setReviews([]);
+    }
   }
 
   useEffect(() => {
@@ -78,6 +84,12 @@ export default function OcularInvestigationsAIReview({
       setError(err instanceof Error ? err.message : "Unable to load ocular investigations.")
     );
   }, [encounterId]);
+
+  useEffect(() => {
+    if (!allowedInvestigationTypes.includes(form.investigation_type as "visual_field" | "oct" | "anterior_segment" | "other")) {
+      setForm((current) => ({ ...current, investigation_type: allowedInvestigationTypes[0] || "other" }));
+    }
+  }, [allowedInvestigationTypes, form.investigation_type]);
 
   async function upload() {
     if (!file) {
@@ -184,10 +196,10 @@ export default function OcularInvestigationsAIReview({
       <div className="grid gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-2 lg:grid-cols-3">
         <select className="rounded border px-3 py-2" value={form.investigation_type}
           onChange={(e) => setForm({ ...form, investigation_type: e.target.value })}>
-          <option value="visual_field">Visual field</option>
-          <option value="oct">OCT</option>
-          <option value="anterior_segment">Anterior segment</option>
-          <option value="other">Other</option>
+          {allowedInvestigationTypes.includes("visual_field") ? <option value="visual_field">Visual field</option> : null}
+          {allowedInvestigationTypes.includes("oct") ? <option value="oct">OCT</option> : null}
+          {allowedInvestigationTypes.includes("anterior_segment") ? <option value="anterior_segment">Anterior segment</option> : null}
+          {allowedInvestigationTypes.includes("other") ? <option value="other">Other</option> : null}
         </select>
         <select className="rounded border px-3 py-2" value={form.laterality}
           onChange={(e) => setForm({ ...form, laterality: e.target.value })}>
@@ -269,7 +281,7 @@ export default function OcularInvestigationsAIReview({
           ))}
       </div>
 
-      <div className="border-t pt-6">
+      {enableAIReview ? <div className="border-t pt-6">
         <h2 className="text-xl font-semibold">Sentinel AI Clinical Review</h2>
         <p className="mt-1 text-sm text-gray-600">
           Complete the optometrist assessment first. AI output is advisory and
@@ -354,7 +366,7 @@ export default function OcularInvestigationsAIReview({
             </article>
           ))}
         </div>
-      </div>
+      </div> : null}
     </section>
   );
 }

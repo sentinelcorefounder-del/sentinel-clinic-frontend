@@ -118,6 +118,16 @@ export default function ReportForm({
   }, []);
 
   useEffect(() => {
+    if (!currentUser?.clinical_profile?.is_verified || report?.clinical_responsibility) return;
+    const profile = currentUser.clinical_profile;
+    setSignature((current) => ({
+      signer_name: current.signer_name || profile.signature_name || profile.display_name || "",
+      signer_role: current.signer_role || profile.professional_role || "",
+      signer_registration_number: current.signer_registration_number || profile.registration_number || "",
+    }));
+  }, [currentUser, report?.clinical_responsibility]);
+
+  useEffect(() => {
     setReport(existingReport || null);
     if (existingReport) {
       setFormData({
@@ -365,10 +375,11 @@ export default function ReportForm({
           <h3 className="font-semibold text-blue-950">Clinical responsibility</h3>
           <p className="mt-1 text-sm text-blue-900">Clinical authority comes from your optometrist or qualified reviewer role, independently of any clinic-administration role.</p>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <input value={signature.signer_name} onChange={(e) => setSignature({ ...signature, signer_name: e.target.value })} placeholder="Clinician full name" className="rounded border bg-white p-3" disabled={!isEditable} />
-            <input value={signature.signer_role} onChange={(e) => setSignature({ ...signature, signer_role: e.target.value })} placeholder="Professional role" className="rounded border bg-white p-3" disabled={!isEditable} />
-            <input value={signature.signer_registration_number} onChange={(e) => setSignature({ ...signature, signer_registration_number: e.target.value })} placeholder="Professional registration number" className="rounded border bg-white p-3" disabled={!isEditable} />
+            <div className="rounded border bg-white p-3"><p className="text-xs font-semibold uppercase text-slate-500">Clinician</p><p className="mt-1 font-medium">{signature.signer_name || "Not available"}</p></div>
+            <div className="rounded border bg-white p-3"><p className="text-xs font-semibold uppercase text-slate-500">Professional role</p><p className="mt-1 font-medium">{signature.signer_role || "Not available"}</p></div>
+            <div className="rounded border bg-white p-3"><p className="text-xs font-semibold uppercase text-slate-500">Registration</p><p className="mt-1 font-medium">{currentUser?.clinical_profile?.registration_body ? `${currentUser.clinical_profile.registration_body} · ` : ""}{signature.signer_registration_number || "Not available"}</p></div>
           </div>
+          <p className="mt-2 text-xs text-blue-900">These details come from the verified Professional Profile. Update the profile and complete re-verification if professional credentials change.</p>
           {report?.clinical_responsibility && report.clinical_responsibility.current_clinician !== currentUser?.id ? (
             <textarea value={takeoverReason} onChange={(e) => setTakeoverReason(e.target.value)} placeholder="Required professional takeover reason" rows={2} className="mt-3 w-full rounded border bg-white p-3" disabled={!isEditable} />
           ) : null}

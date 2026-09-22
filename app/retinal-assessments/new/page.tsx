@@ -338,8 +338,8 @@ export default function NewRetinalAssessmentPage() {
         <div className="grid gap-3 md:grid-cols-3">
           {[
             ["diabetic_retinal_assessment", "Diabetic retinal assessment", "Existing diabetic grading and report workflow."],
-            ["eye_health_screening", "Targeted Retinal and Glaucoma-Risk Screening", "Visual acuity, eye pressure, visual fields and retinal/optic-disc screening; not a comprehensive eye examination."],
-            ["combined_diabetic_eye_health", "Combined Diabetic Retinal Assessment and Targeted Glaucoma-Risk Screening", "Existing diabetic report plus the separate targeted retinal and glaucoma-risk screening report."],
+            ["eye_health_screening", "Retinal and Glaucoma-Risk Assessment", "Visual acuity, eye pressure, visual fields and retinal/optic-disc assessment; not a complete sight test or comprehensive ophthalmic examination."],
+            ["combined_diabetic_eye_health", "Combined Diabetic Retinal and Glaucoma-Risk Assessment", "One combined clinical PDF containing the diabetic retinal and glaucoma-risk assessment components."],
             ["comprehensive_ocular_assessment", "Comprehensive ocular assessment", "Detailed clinic-owned ocular case-file workflow."],
           ].map(([value, title, description]) => {
             const disabled =

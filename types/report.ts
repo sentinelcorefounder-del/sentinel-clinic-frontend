@@ -154,6 +154,7 @@ export type EyeHealthScreeningReport = {
   left_fundus_result: string;
   selected_fundus_upload_ids: number[];
   selected_visual_field_investigation_ids: number[];
+  selected_ocular_investigation_ids: number[];
   status: "draft" | "finalized";
   previewed_at: string | null;
   lock_version: number;

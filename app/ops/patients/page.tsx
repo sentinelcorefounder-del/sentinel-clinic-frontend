@@ -52,8 +52,9 @@ export default async function OpsPatientsPage({ searchParams }: Props) {
   const payment_status = valueOf(sp.payment_status);
   const report_status = valueOf(sp.report_status);
   const referral_status = valueOf(sp.referral_status);
+  const ordering = valueOf(sp.ordering) || "-created_at";
   const patients = await serverFetch(
-    `/api/ops/patients/${buildQuery({ search, hospital, clinic, payment_status, report_status, referral_status })}`,
+    `/api/ops/patients/${buildQuery({ search, hospital, clinic, payment_status, report_status, referral_status, ordering })}`,
   );
   return (
     <div>
@@ -62,7 +63,7 @@ export default async function OpsPatientsPage({ searchParams }: Props) {
         Global patient registry across hospitals, clinics, reports, payments and
         images.
       </p>
-      <form className="mb-6 grid grid-cols-1 gap-3 rounded-xl bg-white p-4 shadow md:grid-cols-6">
+      <form className="mb-6 grid grid-cols-1 gap-3 rounded-xl bg-white p-4 shadow md:grid-cols-7">
         <input
           name="search"
           defaultValue={search}
@@ -118,7 +119,10 @@ export default async function OpsPatientsPage({ searchParams }: Props) {
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <button className="rounded bg-slate-950 px-4 py-2 text-sm font-semibold text-white md:col-span-6">
+        <select name="ordering" defaultValue={ordering} className="rounded border px-3 py-2 text-sm">
+          <option value="-created_at">Newest registered</option><option value="created_at">Oldest registered</option><option value="name">Name A–Z</option><option value="-name">Name Z–A</option><option value="patient_id">Patient ID A–Z</option><option value="-patient_id">Patient ID Z–A</option>
+        </select>
+        <button className="rounded bg-slate-950 px-4 py-2 text-sm font-semibold text-white md:col-span-7">
           Apply Filters
         </button>
       </form>

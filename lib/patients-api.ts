@@ -8,6 +8,7 @@ export type PatientQuery = {
   source?: PatientSourceFilter;
   hospitalId?: number | string | null;
   diabetic?: "all" | "yes" | "no";
+  ordering?: "name" | "-name" | "created_at" | "-created_at" | "patient_id" | "-patient_id";
 };
 
 const API_BASE_URL =
@@ -34,6 +35,9 @@ export async function fetchClinicPatients(
 
   if (params.diabetic && params.diabetic !== "all") {
     query.set("diabetic", params.diabetic);
+  }
+  if (params.ordering) {
+    query.set("ordering", params.ordering);
   }
 
   const suffix = query.toString()

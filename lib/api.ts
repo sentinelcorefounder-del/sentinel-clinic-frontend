@@ -336,7 +336,7 @@ export async function previewEyeHealthReport(reportId: number, reportFormat: "pa
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(formatApiError(data, "Failed to preview targeted screening report."));
+    throw new Error(formatApiError(data, "Failed to preview retinal and glaucoma-risk assessment report."));
   }
   return res.blob();
 }
@@ -347,7 +347,7 @@ export async function finalizeEyeHealthReport(reportId: number, expectedVersion:
     body: JSON.stringify({ expected_version: expectedVersion, signoff_confirmed: true }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(data, "Failed to finalize targeted screening report."));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to finalize retinal and glaucoma-risk assessment report."));
   return data as import("@/types/report").EyeHealthScreeningReport;
 }
 
@@ -1003,10 +1003,11 @@ export async function rejectOpsReport(reportId: string | number, note: string, e
 }
 
 
-export async function fetchClinicReports(params?: { search?: string; status?: string }) {
+export async function fetchClinicReports(params?: { search?: string; status?: string; ordering?: string }) {
   const query = new URLSearchParams();
   if (params?.search) query.set("search", params.search);
   if (params?.status) query.set("status", params.status);
+  if (params?.ordering) query.set("ordering", params.ordering);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   const res = await fetch(`${API_URL}/reports/clinic/${suffix}`, {
     cache: "no-store",

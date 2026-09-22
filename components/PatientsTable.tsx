@@ -35,6 +35,7 @@ export default function PatientsTable() {
     useState<PatientSourceFilter>("all");
   const [pathway, setPathway] = useState<PathwayFilter>("all");
   const [diabeticFilter, setDiabeticFilter] = useState<"all" | "yes" | "no">("all");
+  const [ordering, setOrdering] = useState<"name" | "-name" | "created_at" | "-created_at" | "patient_id" | "-patient_id">("-created_at");
   const [hospitalId, setHospitalId] =
     useState<number | null>(null);
   const [hospitalLabelsOpen, setHospitalLabelsOpen] =
@@ -72,7 +73,8 @@ export default function PatientsTable() {
   async function loadPatients(
     nextSource = source,
     nextHospitalId = hospitalId,
-    nextDiabetic = diabeticFilter
+    nextDiabetic = diabeticFilter,
+    nextOrdering = ordering
   ) {
     try {
       setLoading(true);
@@ -86,6 +88,7 @@ export default function PatientsTable() {
             ? nextHospitalId
             : null,
         diabetic: nextDiabetic,
+        ordering: nextOrdering,
       });
 
       setPatients(data);
@@ -285,6 +288,23 @@ export default function PatientsTable() {
             placeholder="Search patient, referral or hospital"
             className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 placeholder:text-slate-500 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
+          <select
+            value={ordering}
+            onChange={async (event) => {
+              const value = event.target.value as typeof ordering;
+              setOrdering(value);
+              await loadPatients(source, hospitalId, diabeticFilter, value);
+            }}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm"
+            aria-label="Sort patients"
+          >
+            <option value="-created_at">Newest registered</option>
+            <option value="created_at">Oldest registered</option>
+            <option value="name">Name A–Z</option>
+            <option value="-name">Name Z–A</option>
+            <option value="patient_id">Patient ID A–Z</option>
+            <option value="-patient_id">Patient ID Z–A</option>
+          </select>
           <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
             Search
           </button>
