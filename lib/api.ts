@@ -315,7 +315,7 @@ export async function fetchEyeHealthReport(encounterId: string | number) {
   });
   if (res.status === 404) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(data, "Failed to load targeted screening report."));
+  if (!res.ok) throw new Error(formatApiError(data, "Failed to load retinal and glaucoma-risk assessment report."));
   return data as import("@/types/report").EyeHealthScreeningReport;
 }
 
@@ -325,7 +325,7 @@ export async function saveEyeHealthReport(encounterId: string | number, data: Re
     body: JSON.stringify({ ...data, ...(expectedVersion === undefined ? {} : { expected_version: expectedVersion }) }),
   });
   const responseData = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to save targeted screening report."));
+  if (!res.ok) throw new Error(formatApiError(responseData, "Failed to save retinal and glaucoma-risk assessment report."));
   return responseData as import("@/types/report").EyeHealthScreeningReport;
 }
 
