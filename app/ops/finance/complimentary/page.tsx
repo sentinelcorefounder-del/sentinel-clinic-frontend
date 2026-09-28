@@ -4,7 +4,7 @@ import ComplimentaryManager from "./ComplimentaryManager";
 export default async function ComplimentaryPage() {
   const [items, records, capabilities] = await Promise.all([
     serverFetch("/api/finance/complimentary/"),
-    serverFetch("/api/finance/financial-records/"),
+    serverFetch("/api/finance/complimentary/eligible-records/"),
     serverFetch("/api/finance/capabilities/"),
   ]);
   return <div className="space-y-6"><h1 className="text-3xl font-bold">Complimentary services</h1>

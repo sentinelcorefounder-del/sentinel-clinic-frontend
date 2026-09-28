@@ -23,7 +23,7 @@ export default function ComplimentaryManager({ items, records, capabilities }: {
       act("/api/finance/complimentary/", { financial_record: Number(record), reason, idempotency_key: requestKey });
     }}>
       <label className="block">Unpaid service<select required value={record} onChange={e => { setRecord(e.target.value); setKey(""); }} className="mt-1 block w-full rounded border p-2">
-        <option value="">Select encounter</option>{records.filter(r => ["priced", "awaiting_payment"].includes(r.status)).map(r => <option key={r.id} value={r.id}>{r.encounter_id} · {r.patient_display} · {r.currency} {r.gross_amount}</option>)}
+        <option value="">Select encounter</option>{records.map(r => <option key={r.id} value={r.id}>{r.encounter_id} · {r.patient_display} · {r.currency} {r.gross_amount}</option>)}
       </select></label>
       <label className="block">Reason<textarea required value={reason} onChange={e => { setReason(e.target.value); setKey(""); }} className="mt-1 block w-full rounded border p-2" /></label>
       <p className="text-sm text-slate-600">A separate finance approver must decide this request. Approved dispositions are final here; only pending requests can be cancelled.</p>
