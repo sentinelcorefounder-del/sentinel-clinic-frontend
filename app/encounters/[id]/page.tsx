@@ -1203,6 +1203,7 @@ export default function EncounterDetailPage({ params }: Props) {
               ? ["visual_field", "oct", "other"]
               : ["oct", "other"]}
           enableAIReview={isComprehensiveOcular}
+          onInvestigationsChanged={setOcularInvestigations}
           fundusUploads={uploads.map((upload) => ({
             ...upload,
             image_file: resolveFileUrl(upload.image_file),

@@ -21,6 +21,7 @@ type Props = {
   assessment?: OcularDiagnosticAssessment | null;
   allowedInvestigationTypes?: Array<"visual_field" | "oct" | "anterior_segment" | "other">;
   enableAIReview?: boolean;
+  onInvestigationsChanged?: (investigations: OcularInvestigation[]) => void;
   fundusUploads?: Array<{
     id: number;
     eye_laterality: string;
@@ -34,6 +35,7 @@ export default function OcularInvestigationsAIReview({
   assessment,
   allowedInvestigationTypes = ["visual_field", "oct", "anterior_segment", "other"],
   enableAIReview = false,
+  onInvestigationsChanged,
   fundusUploads = [],
 }: Props) {
   const [investigations, setInvestigations] = useState<OcularInvestigation[]>([]);
@@ -69,6 +71,7 @@ export default function OcularInvestigationsAIReview({
   async function refresh() {
     const loadedInvestigations = await fetchOcularInvestigations(encounterId);
     setInvestigations(loadedInvestigations);
+    onInvestigationsChanged?.(loadedInvestigations);
     if (enableAIReview) {
       const loadedReviewData = await fetchOcularAIReviews(encounterId);
       setReviews(loadedReviewData.reviews);
